@@ -1,0 +1,52 @@
+export interface Feed {
+  id: string;
+  title: string;
+  url: string;
+  description?: string;
+  feed_type: string;
+  last_fetched?: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+}
+
+export interface Article {
+  id: string;
+  feed_id: string;
+  title: string;
+  link?: string;
+  description?: string;
+  content?: string;
+  author?: string;
+  published_at?: string;
+  created_at: string;
+  updated_at: string;
+  is_read: boolean;
+  is_bookmarked: boolean;
+  guid?: string;
+}
+
+export interface NewFeed {
+  title: string;
+  url: string;
+  description?: string;
+  feed_type: string;
+}
+
+export interface FeedUpdate {
+  title?: string;
+  description?: string;
+  last_fetched?: string;
+  is_active?: boolean;
+}
+
+export interface ArticleUpdate {
+  title?: string;
+  link?: string;
+  description?: string;
+  content?: string;
+  author?: string;
+  published_at?: string;
+  is_read?: boolean;
+  is_bookmarked?: boolean;
+}

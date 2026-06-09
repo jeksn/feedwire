@@ -1,0 +1,581 @@
+/* macOS Design System */
+:root {
+  /* macOS Colors */
+  --macos-bg-primary: #ffffff;
+  --macos-bg-secondary: #f2f2f7;
+  --macos-bg-tertiary: #ffffff;
+  --macos-border: #d1d1d6;
+  --macos-border-light: #e5e5ea;
+  --macos-text-primary: #1d1d1f;
+  --macos-text-secondary: #86868b;
+  --macos-text-tertiary: #8e8e93;
+  --macos-accent: #007aff;
+  --macos-accent-hover: #0056b3;
+  --macos-success: #34c759;
+  --macos-warning: #ff9500;
+  --macos-error: #ff3b30;
+  --macos-sidebar-bg: #f6f6f6;
+  --macos-sidebar-border: #e5e5e5;
+  
+  /* Typography */
+  --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 14px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 18px;
+  --font-size-3xl: 20px;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-system);
+  font-size: var(--font-size-base);
+  color: var(--macos-text-primary);
+  background-color: var(--macos-bg-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--macos-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--macos-text-secondary);
+}
+
+/* Button Styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-system);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: none;
+  min-height: 28px;
+}
+
+.btn-primary {
+  background-color: var(--macos-accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--macos-accent-hover);
+}
+
+.btn-secondary {
+  background-color: var(--macos-bg-secondary);
+  color: var(--macos-text-primary);
+}
+
+.btn-secondary:hover {
+  background-color: var(--macos-border);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--macos-text-secondary);
+}
+
+.btn-ghost:hover {
+  background-color: var(--macos-bg-secondary);
+  color: var(--macos-text-primary);
+}
+
+.btn-icon {
+  padding: var(--spacing-xs);
+  width: 28px;
+  height: 28px;
+}
+
+.btn-sm {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  min-height: 24px;
+}
+
+.btn-lg {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-lg);
+  min-height: 32px;
+}
+
+/* Input Styles */
+.input {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-system);
+  font-size: var(--font-size-sm);
+  background-color: var(--macos-bg-primary);
+  color: var(--macos-text-primary);
+  transition: border-color 0.2s ease;
+  min-height: 28px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--macos-accent);
+}
+
+.input::placeholder {
+  color: var(--macos-text-tertiary);
+}
+
+/* Card Styles */
+.card {
+  background-color: var(--macos-bg-primary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.card-hover {
+  transition: all 0.2s ease;
+}
+
+.card-hover:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Layout Components */
+.app-container {
+  display: flex;
+  height: 100vh;
+  background-color: var(--macos-bg-primary);
+}
+
+.sidebar {
+  width: 280px;
+  background-color: var(--macos-sidebar-bg);
+  border-right: 1px solid var(--macos-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.article-list {
+  width: 400px;
+  background-color: var(--macos-bg-secondary);
+  border-right: 1px solid var(--macos-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-pane {
+  flex: 1;
+  background-color: var(--macos-bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header Styles */
+.header {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--macos-border);
+  background-color: var(--macos-bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+}
+
+.sidebar-header {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--macos-sidebar-border);
+  background-color: var(--macos-sidebar-bg);
+}
+
+/* List Styles */
+.list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.list-item {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--macos-border-light);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.list-item:hover {
+  background-color: var(--macos-bg-secondary);
+}
+
+.list-item.active {
+  background-color: var(--macos-accent);
+  color: white;
+}
+
+.list-item.unread {
+  font-weight: 600;
+}
+
+.feed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feed-title {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--macos-text-primary);
+  truncate: true;
+}
+
+.feed-unread-count {
+  background-color: var(--macos-accent);
+  color: white;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.article-item {
+  border-bottom: 1px solid var(--macos-border-light);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.article-item:hover {
+  background-color: var(--macos-bg-secondary);
+}
+
+.article-item.active {
+  background-color: var(--macos-accent);
+  color: white;
+}
+
+.article-item.unread {
+  background-color: var(--macos-bg-primary);
+}
+
+.article-item.read {
+  background-color: var(--macos-bg-secondary);
+  opacity: 0.8;
+}
+
+.article-header {
+  padding: var(--spacing-md);
+}
+
+.article-title {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--macos-text-primary);
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.3;
+}
+
+.article-meta {
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.article-snippet {
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-secondary);
+  margin-top: var(--spacing-xs);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Content Pane Styles */
+.content-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--macos-border);
+}
+
+.content-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--macos-text-primary);
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.3;
+}
+
+.content-meta {
+  font-size: var(--font-size-sm);
+  color: var(--macos-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.content-body {
+  flex: 1;
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+.content-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+.content-body a {
+  color: var(--macos-accent);
+  text-decoration: none;
+}
+
+.content-body a:hover {
+  text-decoration: underline;
+}
+
+.content-body p {
+  margin-bottom: var(--spacing-md);
+}
+
+.content-body h1,
+.content-body h2,
+.content-body h3,
+.content-body h4,
+.content-body h5,
+.content-body h6 {
+  margin-bottom: var(--spacing-sm);
+  font-weight: 600;
+  color: var(--macos-text-primary);
+}
+
+/* Utility Classes */
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-base { font-size: var(--font-size-base); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+
+.text-primary { color: var(--macos-text-primary); }
+.text-secondary { color: var(--macos-text-secondary); }
+.text-tertiary { color: var(--macos-text-tertiary); }
+
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+
+.gap-xs { gap: var(--spacing-xs); }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+.gap-lg { gap: var(--spacing-lg); }
+
+.p-xs { padding: var(--spacing-xs); }
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+
+.m-xs { margin: var(--spacing-xs); }
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+
+.mb-xs { margin-bottom: var(--spacing-xs); }
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+
+.hidden { display: none; }
+.opacity-50 { opacity: 0.5; }
+.opacity-75 { opacity: 0.75; }
+
+/* Loading State */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  color: var(--macos-text-secondary);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--macos-border);
+  border-top: 2px solid var(--macos-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  color: var(--macos-text-secondary);
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+  color: var(--macos-text-primary);
+}
+
+.empty-state-description {
+  font-size: var(--font-size-sm);
+  color: var(--macos-text-secondary);
+  max-width: 300px;
+}
+
+/* Dialog Styles */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.dialog {
+  background-color: var(--macos-bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--macos-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dialog-body {
+  padding: var(--spacing-lg);
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dialog-footer {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--macos-border);
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+
+.text-error {
+  color: var(--macos-error);
+}
+
+.text-accent {
+  color: var(--macos-accent);
+}
+
+/* Animation classes */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
