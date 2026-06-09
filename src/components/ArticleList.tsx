@@ -1,4 +1,5 @@
 import { RefreshCw, ExternalLink } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
 
 interface ArticleListProps {
@@ -7,6 +8,7 @@ interface ArticleListProps {
   onArticleSelect: (article: Article) => void;
   loading: boolean;
   selectedFeed: Feed | null;
+  title?: string;
   onRefreshFeed: () => void;
 }
 
@@ -16,6 +18,7 @@ export function ArticleList({
   onArticleSelect,
   loading,
   selectedFeed,
+  title,
   onRefreshFeed
 }: ArticleListProps) {
   const formatDate = (dateString?: string) => {
@@ -44,8 +47,10 @@ export function ArticleList({
   };
 
   const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength).trim() + '...';
+    // Strip HTML tags for snippet display
+    const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (plain.length <= maxLength) return plain;
+    return plain.substring(0, maxLength).trim() + '...';
   };
 
   return (
@@ -53,7 +58,7 @@ export function ArticleList({
       <div className="header">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">
-            {selectedFeed ? selectedFeed.title : 'All Articles'}
+            {title ?? (selectedFeed ? selectedFeed.title : 'All Articles')}
           </h2>
           <button
             className="btn btn-icon btn-ghost"
@@ -109,7 +114,7 @@ export function ArticleList({
                       className="btn btn-icon btn-ghost ml-auto"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.open(article.link, '_blank');
+                        openUrl(article.link!).catch(console.error);
                       }}
                       title="Open in browser"
                     >

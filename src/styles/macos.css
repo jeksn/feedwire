@@ -579,3 +579,53 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Sidebar section divider */
+.sidebar-section-divider {
+  height: 1px;
+  background-color: var(--macos-sidebar-border);
+  margin: var(--spacing-xs) 0;
+}
+
+/* Feed delete button — small, shown on hover */
+.feed-delete-btn {
+  width: 22px;
+  height: 22px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.feed-delete-btn:hover {
+  opacity: 1;
+  color: var(--macos-error);
+  background-color: rgba(255, 59, 48, 0.1);
+}
+
+.feed-delete-confirm {
+  opacity: 1;
+  color: var(--macos-error);
+  background-color: rgba(255, 59, 48, 0.15);
+}
+
+/* Keep feed-unread-count white on active list items */
+.list-item.active .feed-unread-count {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.list-item.active .feed-title {
+  color: white;
+}
+
+.list-item.active .text-secondary {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Margin top utilities */
+.mt-xs { margin-top: var(--spacing-xs); }
+.mt-sm { margin-top: var(--spacing-sm); }
+.mt-md { margin-top: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }
+
+/* ml-auto for pushing elements to the right in flex containers */
+.ml-auto { margin-left: auto; }
+.ml-sm { margin-left: var(--spacing-sm); }

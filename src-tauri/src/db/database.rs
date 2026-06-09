@@ -156,39 +156,25 @@ impl Database {
     }
 
     pub async fn update_feed(&self, id: &str, update: FeedUpdate) -> Result<Feed, DatabaseError> {
-        let mut query = String::from("UPDATE feeds SET updated_at = ?");
-        let mut params = vec![];
-        
-        if update.title.is_some() {
-            query.push_str(", title = ?");
-            params.push(update.title.unwrap());
-        }
-        if update.description.is_some() {
-            query.push_str(", description = ?");
-            params.push(update.description.unwrap());
-        }
-        if update.last_fetched.is_some() {
-            query.push_str(", last_fetched = ?");
-            params.push(update.last_fetched.unwrap().to_rfc3339());
-        }
-        if update.is_active.is_some() {
-            query.push_str(", is_active = ?");
-            params.push(if update.is_active.unwrap() { "1" } else { "0" }.to_string());
-        }
-        
-        query.push_str(" WHERE id = ?");
-        
-        let now = chrono::Utc::now();
-        params.push(now.to_rfc3339());
+        let now = chrono::Utc::now().to_rfc3339();
+
+        let mut set_clauses = vec!["updated_at = ?".to_string()];
+        let mut params: Vec<String> = vec![now];  // slot 1 = updated_at
+
+        if let Some(v) = update.title        { set_clauses.push("title = ?".into());        params.push(v); }
+        if let Some(v) = update.description  { set_clauses.push("description = ?".into());  params.push(v); }
+        if let Some(v) = update.last_fetched { set_clauses.push("last_fetched = ?".into()); params.push(v.to_rfc3339()); }
+        if let Some(v) = update.is_active    { set_clauses.push("is_active = ?".into());    params.push(if v { "1" } else { "0" }.into()); }
+
+        let query = format!("UPDATE feeds SET {} WHERE id = ?", set_clauses.join(", "));
         params.push(id.to_string());
-        
-        let mut query_builder = sqlx::query(&query);
+
+        let mut q = sqlx::query(&query);
         for param in params {
-            query_builder = query_builder.bind(param);
+            q = q.bind(param);
         }
-        
-        query_builder.execute(&self.pool).await?;
-        
+        q.execute(&self.pool).await?;
+
         self.get_feed_by_id(id).await
     }
 
@@ -224,7 +210,7 @@ impl Database {
 
         sqlx::query(
             r#"
-            INSERT OR REPLACE INTO articles (id, feed_id, title, link, description, content, author, published_at, created_at, updated_at, is_read, is_bookmarked, guid)
+            INSERT OR IGNORE INTO articles (id, feed_id, title, link, description, content, author, published_at, created_at, updated_at, is_read, is_bookmarked, guid)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
@@ -289,55 +275,30 @@ impl Database {
     }
 
     pub async fn update_article(&self, id: &str, update: ArticleUpdate) -> Result<Article, DatabaseError> {
-        let mut query = String::from("UPDATE articles SET updated_at = ?");
-        let mut params = vec![];
-        
-        if update.title.is_some() {
-            query.push_str(", title = ?");
-            params.push(update.title.unwrap());
-        }
-        if update.link.is_some() {
-            query.push_str(", link = ?");
-            params.push(update.link.unwrap());
-        }
-        if update.description.is_some() {
-            query.push_str(", description = ?");
-            params.push(update.description.unwrap());
-        }
-        if update.content.is_some() {
-            query.push_str(", content = ?");
-            params.push(update.content.unwrap());
-        }
-        if update.author.is_some() {
-            query.push_str(", author = ?");
-            params.push(update.author.unwrap());
-        }
-        if update.published_at.is_some() {
-            query.push_str(", published_at = ?");
-            params.push(update.published_at.unwrap().to_rfc3339());
-        }
-        if update.is_read.is_some() {
-            query.push_str(", is_read = ?");
-            params.push(if update.is_read.unwrap() { "1" } else { "0" }.to_string());
-        }
-        if update.is_bookmarked.is_some() {
-            query.push_str(", is_bookmarked = ?");
-            params.push(if update.is_bookmarked.unwrap() { "1" } else { "0" }.to_string());
-        }
-        
-        query.push_str(" WHERE id = ?");
-        
-        let now = chrono::Utc::now();
-        params.push(now.to_rfc3339());
-        params.push(id.to_string());
-        
-        let mut query_builder = sqlx::query(&query);
+        let now = chrono::Utc::now().to_rfc3339();
+
+        // Build SET clauses; updated_at is always set and must be bound first
+        let mut set_clauses = vec!["updated_at = ?".to_string()];
+        let mut params: Vec<String> = vec![now];  // slot 1 = updated_at
+
+        if let Some(v) = update.title        { set_clauses.push("title = ?".into());       params.push(v); }
+        if let Some(v) = update.link         { set_clauses.push("link = ?".into());        params.push(v); }
+        if let Some(v) = update.description  { set_clauses.push("description = ?".into()); params.push(v); }
+        if let Some(v) = update.content      { set_clauses.push("content = ?".into());     params.push(v); }
+        if let Some(v) = update.author       { set_clauses.push("author = ?".into());      params.push(v); }
+        if let Some(v) = update.published_at { set_clauses.push("published_at = ?".into()); params.push(v.to_rfc3339()); }
+        if let Some(v) = update.is_read      { set_clauses.push("is_read = ?".into());     params.push(if v { "1" } else { "0" }.into()); }
+        if let Some(v) = update.is_bookmarked { set_clauses.push("is_bookmarked = ?".into()); params.push(if v { "1" } else { "0" }.into()); }
+
+        let query = format!("UPDATE articles SET {} WHERE id = ?", set_clauses.join(", "));
+        params.push(id.to_string());  // last slot = WHERE id
+
+        let mut q = sqlx::query(&query);
         for param in params {
-            query_builder = query_builder.bind(param);
+            q = q.bind(param);
         }
-        
-        query_builder.execute(&self.pool).await?;
-        
+        q.execute(&self.pool).await?;
+
         self.get_article_by_id(id).await
     }
 

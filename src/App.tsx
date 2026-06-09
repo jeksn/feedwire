@@ -7,11 +7,14 @@ import { feedApi } from "./api/feed";
 import type { Feed, Article } from "./types";
 import "./styles/macos.css";
 
+type View = 'feed' | 'bookmarks';
+
 function App() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedFeed, setSelectedFeed] = useState<Feed | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [selectedView, setSelectedView] = useState<View>('feed');
   const [showAddFeedDialog, setShowAddFeedDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -25,8 +28,7 @@ function App() {
     try {
       const feedsData = await feedApi.getFeeds();
       setFeeds(feedsData);
-      
-      // Load unread counts for each feed
+
       const counts: Record<string, number> = {};
       for (const feed of feedsData) {
         counts[feed.id] = await feedApi.getUnreadCount(feed.id);
@@ -49,25 +51,41 @@ function App() {
     }
   };
 
+  const loadBookmarks = async () => {
+    try {
+      setLoading(true);
+      const bookmarked = await feedApi.getBookmarkedArticles();
+      setArticles(bookmarked);
+    } catch (error) {
+      console.error("Failed to load bookmarks:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFeedSelect = (feed: Feed) => {
     setSelectedFeed(feed);
     setSelectedArticle(null);
+    setSelectedView('feed');
     loadArticles(feed.id);
+  };
+
+  const handleBookmarksSelect = () => {
+    setSelectedFeed(null);
+    setSelectedArticle(null);
+    setSelectedView('bookmarks');
+    loadBookmarks();
   };
 
   const handleArticleSelect = async (article: Article) => {
     setSelectedArticle(article);
-    
-    // Mark as read if unread
+
     if (!article.is_read) {
       try {
         const updatedArticle = await feedApi.markArticleRead(article.id, true);
-        setArticles(prev => 
-          prev.map(a => a.id === article.id ? updatedArticle : a)
-        );
+        setArticles(prev => prev.map(a => a.id === article.id ? updatedArticle : a));
         setSelectedArticle(updatedArticle);
-        
-        // Update unread count
+
         if (selectedFeed) {
           setUnreadCounts(prev => ({
             ...prev,
@@ -86,7 +104,11 @@ function App() {
       const newFeed = await feedApi.addFeed(url);
       setFeeds(prev => [...prev, newFeed]);
       setShowAddFeedDialog(false);
-      loadFeeds(); // Reload to get updated counts
+      // Auto-select the new feed and load its articles
+      setSelectedFeed(newFeed);
+      setSelectedView('feed');
+      await loadFeeds();
+      await loadArticles(newFeed.id);
     } catch (error) {
       console.error("Failed to add feed:", error);
       throw error;
@@ -95,12 +117,32 @@ function App() {
     }
   };
 
+  const handleDeleteFeed = async (feedId: string) => {
+    try {
+      await feedApi.deleteFeed(feedId);
+      setFeeds(prev => prev.filter(f => f.id !== feedId));
+      setUnreadCounts(prev => {
+        const next = { ...prev };
+        delete next[feedId];
+        return next;
+      });
+      if (selectedFeed?.id === feedId) {
+        setSelectedFeed(null);
+        setSelectedView('feed');
+        setArticles([]);
+        setSelectedArticle(null);
+      }
+    } catch (error) {
+      console.error("Failed to delete feed:", error);
+    }
+  };
+
   const handleRefreshFeed = async (feedId: string) => {
     try {
       setLoading(true);
       await feedApi.refreshFeed(feedId);
       loadArticles(feedId);
-      loadFeeds(); // Reload to get updated counts
+      loadFeeds();
     } catch (error) {
       console.error("Failed to refresh feed:", error);
     } finally {
@@ -112,7 +154,11 @@ function App() {
     try {
       setLoading(true);
       await feedApi.refreshAllFeeds();
-      loadArticles();
+      if (selectedView === 'bookmarks') {
+        loadBookmarks();
+      } else {
+        loadArticles(selectedFeed?.id);
+      }
       loadFeeds();
     } catch (error) {
       console.error("Failed to refresh all feeds:", error);
@@ -124,43 +170,58 @@ function App() {
   const handleToggleBookmark = async (articleId: string) => {
     try {
       const updatedArticle = await feedApi.toggleBookmark(articleId);
-      setArticles(prev => 
-        prev.map(a => a.id === articleId ? updatedArticle : a)
-      );
+      setArticles(prev => {
+        // In bookmarks view, remove article if it's been unbookmarked
+        if (selectedView === 'bookmarks' && !updatedArticle.is_bookmarked) {
+          return prev.filter(a => a.id !== articleId);
+        }
+        return prev.map(a => a.id === articleId ? updatedArticle : a);
+      });
       if (selectedArticle?.id === articleId) {
-        setSelectedArticle(updatedArticle);
+        // If unbookmarked while in bookmarks view, deselect
+        if (selectedView === 'bookmarks' && !updatedArticle.is_bookmarked) {
+          setSelectedArticle(null);
+        } else {
+          setSelectedArticle(updatedArticle);
+        }
       }
     } catch (error) {
       console.error("Failed to toggle bookmark:", error);
     }
   };
 
+  const articleListTitle = selectedView === 'bookmarks' ? 'Bookmarks' : undefined;
+
   return (
     <div className="app-container">
       <Sidebar
         feeds={feeds}
         selectedFeed={selectedFeed}
+        selectedView={selectedView}
         unreadCounts={unreadCounts}
         onFeedSelect={handleFeedSelect}
+        onBookmarksSelect={handleBookmarksSelect}
         onAddFeed={() => setShowAddFeedDialog(true)}
         onRefreshAll={handleRefreshAll}
+        onDeleteFeed={handleDeleteFeed}
         loading={loading}
       />
-      
+
       <ArticleList
         articles={articles}
         selectedArticle={selectedArticle}
         onArticleSelect={handleArticleSelect}
         loading={loading}
         selectedFeed={selectedFeed}
+        title={articleListTitle}
         onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
       />
-      
+
       <ContentPane
         article={selectedArticle}
         onToggleBookmark={handleToggleBookmark}
       />
-      
+
       {showAddFeedDialog && (
         <AddFeedDialog
           onClose={() => setShowAddFeedDialog(false)}
