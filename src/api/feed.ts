@@ -51,4 +51,8 @@ export const feedApi = {
   getBookmarkedArticles: async (): Promise<Article[]> => {
     return await invoke('get_bookmarked_articles');
   },
+
+  getUnreadArticles: async (): Promise<Article[]> => {
+    return await invoke('get_unread_articles');
+  },
 };

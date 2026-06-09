@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Plus, RefreshCw, Rss, Trash2, Bookmark } from 'lucide-react';
+import { Plus, RefreshCw, Rss, Trash2, Bookmark, Inbox } from 'lucide-react';
 import type { Feed } from '../types';
 
 interface SidebarProps {
   feeds: Feed[];
   selectedFeed: Feed | null;
-  selectedView: 'feed' | 'bookmarks';
+  selectedView: 'feed' | 'unread' | 'bookmarks';
   unreadCounts: Record<string, number>;
   onFeedSelect: (feed: Feed) => void;
+  onUnreadSelect: () => void;
   onBookmarksSelect: () => void;
   onAddFeed: () => void;
   onRefreshAll: () => void;
@@ -21,6 +22,7 @@ export function Sidebar({
   selectedView,
   unreadCounts,
   onFeedSelect,
+  onUnreadSelect,
   onBookmarksSelect,
   onAddFeed,
   onRefreshAll,
@@ -80,6 +82,22 @@ export function Sidebar({
       </div>
 
       <div className="list">
+        {/* Unread section */}
+        <div
+          className={`list-item ${selectedView === 'unread' ? 'active' : ''}`}
+          onClick={onUnreadSelect}
+        >
+          <div className="feed-item">
+            <div className="flex items-center gap-sm feed-title">
+              <Inbox size={14} />
+              <span>Unread</span>
+            </div>
+            {totalUnread > 0 && (
+              <span className="feed-unread-count">{totalUnread}</span>
+            )}
+          </div>
+        </div>
+
         {/* Bookmarks section */}
         <div
           className={`list-item ${selectedView === 'bookmarks' ? 'active' : ''}`}

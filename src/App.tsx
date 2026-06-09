@@ -7,7 +7,7 @@ import { feedApi } from "./api/feed";
 import type { Feed, Article } from "./types";
 import "./styles/macos.css";
 
-type View = 'feed' | 'bookmarks';
+type View = 'feed' | 'unread' | 'bookmarks';
 
 function App() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -63,11 +63,30 @@ function App() {
     }
   };
 
+  const loadUnread = async () => {
+    try {
+      setLoading(true);
+      const unread = await feedApi.getUnreadArticles();
+      setArticles(unread);
+    } catch (error) {
+      console.error("Failed to load unread:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFeedSelect = (feed: Feed) => {
     setSelectedFeed(feed);
     setSelectedArticle(null);
     setSelectedView('feed');
     loadArticles(feed.id);
+  };
+
+  const handleUnreadSelect = () => {
+    setSelectedFeed(null);
+    setSelectedArticle(null);
+    setSelectedView('unread');
+    loadUnread();
   };
 
   const handleBookmarksSelect = () => {
@@ -83,6 +102,7 @@ function App() {
     if (!article.is_read) {
       try {
         const updatedArticle = await feedApi.markArticleRead(article.id, true);
+        // In unread view, keep article visible while selected but update its state
         setArticles(prev => prev.map(a => a.id === article.id ? updatedArticle : a));
         setSelectedArticle(updatedArticle);
 
@@ -91,6 +111,9 @@ function App() {
             ...prev,
             [selectedFeed.id]: Math.max(0, (prev[selectedFeed.id] || 0) - 1)
           }));
+        } else {
+          // Update global unread counts even without a selected feed
+          loadFeeds();
         }
       } catch (error) {
         console.error("Failed to mark article as read:", error);
@@ -156,6 +179,8 @@ function App() {
       await feedApi.refreshAllFeeds();
       if (selectedView === 'bookmarks') {
         loadBookmarks();
+      } else if (selectedView === 'unread') {
+        loadUnread();
       } else {
         loadArticles(selectedFeed?.id);
       }
@@ -190,7 +215,8 @@ function App() {
     }
   };
 
-  const articleListTitle = selectedView === 'bookmarks' ? 'Bookmarks' : undefined;
+  const articleListTitle = selectedView === 'bookmarks' ? 'Bookmarks'
+    : selectedView === 'unread' ? 'Unread' : undefined;
 
   return (
     <div className="app-container">
@@ -200,6 +226,7 @@ function App() {
         selectedView={selectedView}
         unreadCounts={unreadCounts}
         onFeedSelect={handleFeedSelect}
+        onUnreadSelect={handleUnreadSelect}
         onBookmarksSelect={handleBookmarksSelect}
         onAddFeed={() => setShowAddFeedDialog(true)}
         onRefreshAll={handleRefreshAll}
