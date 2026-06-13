@@ -30,6 +30,7 @@ pub fn run() {
             db::commands::toggle_bookmark,
             db::commands::get_bookmarked_articles,
             db::commands::get_unread_articles,
+            db::commands::mark_all_read,
             db::commands::refresh_feed,
             db::commands::refresh_all_feeds,
             db::commands::get_unread_count,

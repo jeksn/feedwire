@@ -146,6 +146,12 @@ pub async fn get_unread_articles(db: State<'_, DbState>) -> Result<Vec<crate::db
 }
 
 #[tauri::command]
+pub async fn mark_all_read(feed_id: Option<String>, db: State<'_, DbState>) -> Result<(), String> {
+    let db = db.lock().await;
+    db.mark_all_read(feed_id.as_deref()).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn refresh_feed(feed_id: String, db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
     let db = db.lock().await;
     let feed = db.get_feed_by_id(&feed_id).await.map_err(|e| e.to_string())?;

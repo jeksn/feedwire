@@ -312,6 +312,23 @@ impl Database {
         Ok(articles)
     }
 
+    pub async fn mark_all_read(&self, feed_id: Option<&str>) -> Result<(), DatabaseError> {
+        match feed_id {
+            Some(id) => {
+                sqlx::query("UPDATE articles SET is_read = 1 WHERE feed_id = ? AND is_read = 0")
+                    .bind(id)
+                    .execute(&self.pool)
+                    .await?;
+            }
+            None => {
+                sqlx::query("UPDATE articles SET is_read = 1 WHERE is_read = 0")
+                    .execute(&self.pool)
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
     pub async fn get_unread_articles(&self) -> Result<Vec<Article>, DatabaseError> {
         let articles = sqlx::query_as::<_, Article>(
             "SELECT * FROM articles WHERE is_read = 0 ORDER BY published_at DESC, created_at DESC"

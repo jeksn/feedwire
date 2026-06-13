@@ -192,6 +192,24 @@ function App() {
     }
   };
 
+  const handleMarkAllRead = async () => {
+    try {
+      // Pass feedId when in a single feed view, undefined marks all globally
+      await feedApi.markAllRead(selectedView === 'feed' ? selectedFeed?.id : undefined);
+      // Update article list in place — mark everything shown as read
+      setArticles(prev => prev.map(a => ({ ...a, is_read: true })));
+      if (selectedArticle) setSelectedArticle(prev => prev ? { ...prev, is_read: true } : null);
+      // Zero out unread counts
+      if (selectedView === 'feed' && selectedFeed) {
+        setUnreadCounts(prev => ({ ...prev, [selectedFeed.id]: 0 }));
+      } else {
+        setUnreadCounts(prev => Object.fromEntries(Object.keys(prev).map(k => [k, 0])));
+      }
+    } catch (error) {
+      console.error("Failed to mark all as read:", error);
+    }
+  };
+
   const handleToggleBookmark = async (articleId: string) => {
     try {
       const updatedArticle = await feedApi.toggleBookmark(articleId);
@@ -242,6 +260,7 @@ function App() {
         selectedFeed={selectedFeed}
         title={articleListTitle}
         onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
+        onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
       />
 
       <ContentPane

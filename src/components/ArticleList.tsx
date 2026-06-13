@@ -1,4 +1,4 @@
-import { RefreshCw, ExternalLink } from 'lucide-react';
+import { RefreshCw, ExternalLink, CheckCheck } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
 
@@ -10,6 +10,7 @@ interface ArticleListProps {
   selectedFeed: Feed | null;
   title?: string;
   onRefreshFeed: () => void;
+  onMarkAllRead?: () => void;
 }
 
 export function ArticleList({
@@ -19,7 +20,8 @@ export function ArticleList({
   loading,
   selectedFeed,
   title,
-  onRefreshFeed
+  onRefreshFeed,
+  onMarkAllRead
 }: ArticleListProps) {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
@@ -60,14 +62,26 @@ export function ArticleList({
           <h2 className="font-semibold">
             {title ?? (selectedFeed ? selectedFeed.title : 'All Articles')}
           </h2>
-          <button
-            className="btn btn-icon btn-ghost"
-            onClick={onRefreshFeed}
-            disabled={loading}
-            title="Refresh feed"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <div className="flex gap-xs">
+            {onMarkAllRead && articles.some(a => !a.is_read) && (
+              <button
+                className="btn btn-icon btn-ghost"
+                onClick={onMarkAllRead}
+                disabled={loading}
+                title="Mark all as read"
+              >
+                <CheckCheck size={16} />
+              </button>
+            )}
+            <button
+              className="btn btn-icon btn-ghost"
+              onClick={onRefreshFeed}
+              disabled={loading}
+              title="Refresh feed"
+            >
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
       </div>
 

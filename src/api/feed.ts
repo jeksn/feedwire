@@ -55,4 +55,8 @@ export const feedApi = {
   getUnreadArticles: async (): Promise<Article[]> => {
     return await invoke('get_unread_articles');
   },
+
+  markAllRead: async (feedId?: string): Promise<void> => {
+    return await invoke('mark_all_read', { feedId });
+  },
 };
