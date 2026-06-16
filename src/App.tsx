@@ -5,12 +5,14 @@ import { ContentPane } from "./components/ContentPane";
 import { AddFeedDialog } from "./components/AddFeedDialog";
 import { SettingsPane } from "./components/SettingsPane";
 import { feedApi } from "./api/feed";
+import { useTheme } from "./hooks/useTheme";
 import type { Feed, Article } from "./types";
 import "./styles/macos.css";
 
 type View = 'feed' | 'unread' | 'bookmarks' | 'settings';
 
 function App() {
+  const { theme, setTheme } = useTheme();
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedFeed, setSelectedFeed] = useState<Feed | null>(null);
@@ -276,6 +278,8 @@ function App() {
           feedCount={feeds.length}
           onImport={handleImportOpml}
           onExport={handleExportOpml}
+          theme={theme}
+          onThemeChange={setTheme}
         />
       ) : (
         <>

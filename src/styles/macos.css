@@ -46,6 +46,25 @@
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
+/* Dark theme token overrides */
+[data-theme="dark"] {
+  --macos-bg-primary: #1c1c1e;
+  --macos-bg-secondary: #2c2c2e;
+  --macos-bg-tertiary: #3a3a3c;
+  --macos-border: #3a3a3c;
+  --macos-border-light: #2c2c2e;
+  --macos-text-primary: #f5f5f7;
+  --macos-text-secondary: #98989d;
+  --macos-text-tertiary: #6c6c70;
+  --macos-accent: #0a84ff;
+  --macos-accent-hover: #3395ff;
+  --macos-success: #30d158;
+  --macos-warning: #ff9f0a;
+  --macos-error: #ff453a;
+  --macos-sidebar-bg: #111113;
+  --macos-sidebar-border: #2c2c2e;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -656,6 +675,42 @@ body {
 .sidebar-footer {
   margin-top: auto;
   flex-shrink: 0;
+}
+
+/* ── Theme Segment Control ── */
+.theme-segment {
+  display: inline-flex;
+  background-color: var(--macos-bg-secondary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-lg);
+  padding: 3px;
+  gap: 2px;
+}
+
+.theme-segment-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 6px 14px;
+  border-radius: calc(var(--radius-lg) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--macos-text-secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-system);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.theme-segment-btn:hover {
+  color: var(--macos-text-primary);
+}
+
+.theme-segment-btn.active {
+  background-color: var(--macos-bg-primary);
+  color: var(--macos-text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 /* ── Settings Pane ── */

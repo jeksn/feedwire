@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { Upload, Download, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor } from 'lucide-react';
+import type { ThemePreference } from '../hooks/useTheme';
 
 interface SettingsPaneProps {
   feedCount: number;
   onImport: () => Promise<string>;
   onExport: () => Promise<string>;
+  theme: ThemePreference;
+  onThemeChange: (t: ThemePreference) => void;
 }
 
 type Status = { type: 'idle' } | { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
 
-export function SettingsPane({ feedCount, onImport, onExport }: SettingsPaneProps) {
+export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChange }: SettingsPaneProps) {
   const [importStatus, setImportStatus] = useState<Status>({ type: 'idle' });
   const [exportStatus, setExportStatus] = useState<Status>({ type: 'idle' });
 
@@ -51,6 +54,34 @@ export function SettingsPane({ feedCount, onImport, onExport }: SettingsPaneProp
       </div>
 
       <div className="settings-body">
+        {/* Appearance section */}
+        <section className="settings-section">
+          <h3 className="settings-section-title">Appearance</h3>
+          <div className="theme-segment">
+            <button
+              className={`theme-segment-btn${theme === 'light' ? ' active' : ''}`}
+              onClick={() => onThemeChange('light')}
+            >
+              <Sun size={14} />
+              Light
+            </button>
+            <button
+              className={`theme-segment-btn${theme === 'system' ? ' active' : ''}`}
+              onClick={() => onThemeChange('system')}
+            >
+              <Monitor size={14} />
+              System
+            </button>
+            <button
+              className={`theme-segment-btn${theme === 'dark' ? ' active' : ''}`}
+              onClick={() => onThemeChange('dark')}
+            >
+              <Moon size={14} />
+              Dark
+            </button>
+          </div>
+        </section>
+
         {/* Import / Export section */}
         <section className="settings-section">
           <h3 className="settings-section-title">Import & Export</h3>
