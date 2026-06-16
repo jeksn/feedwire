@@ -1,29 +1,39 @@
 import { useState } from 'react';
-import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ThemePreference } from '../hooks/useTheme';
+import type { ImportResult } from '../api/feed';
 
 interface SettingsPaneProps {
   feedCount: number;
-  onImport: () => Promise<string>;
+  onImport: () => Promise<ImportResult>;
   onExport: () => Promise<string>;
   theme: ThemePreference;
   onThemeChange: (t: ThemePreference) => void;
 }
 
-type Status = { type: 'idle' } | { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
+type ImportStatus =
+  | { type: 'idle' }
+  | { type: 'loading' }
+  | { type: 'done'; result: ImportResult }
+  | { type: 'error'; message: string };
+
+type ExportStatus =
+  | { type: 'idle' }
+  | { type: 'loading' }
+  | { type: 'success'; message: string }
+  | { type: 'error'; message: string };
 
 export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChange }: SettingsPaneProps) {
-  const [importStatus, setImportStatus] = useState<Status>({ type: 'idle' });
-  const [exportStatus, setExportStatus] = useState<Status>({ type: 'idle' });
+  const [importStatus, setImportStatus] = useState<ImportStatus>({ type: 'idle' });
+  const [exportStatus, setExportStatus] = useState<ExportStatus>({ type: 'idle' });
 
   const handleImport = async () => {
     setImportStatus({ type: 'loading' });
     try {
-      const message = await onImport();
-      setImportStatus({ type: 'success', message });
+      const result = await onImport();
+      setImportStatus({ type: 'done', result });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Treat "cancelled" as a non-error
       if (msg.toLowerCase().includes('cancel')) {
         setImportStatus({ type: 'idle' });
       } else {
@@ -116,7 +126,7 @@ export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChan
                 )}
                 Import
               </button>
-              <StatusBadge status={importStatus} />
+              <ImportStatusDisplay status={importStatus} />
             </div>
 
             {/* Export */}
@@ -143,7 +153,7 @@ export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChan
                 )}
                 Export
               </button>
-              <StatusBadge status={exportStatus} />
+              <ExportStatusBadge status={exportStatus} />
             </div>
           </div>
         </section>
@@ -161,7 +171,69 @@ export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChan
   );
 }
 
-function StatusBadge({ status }: { status: Status }) {
+function ImportStatusDisplay({ status }: { status: ImportStatus }) {
+  const [failuresExpanded, setFailuresExpanded] = useState(false);
+
+  if (status.type === 'idle' || status.type === 'loading') return null;
+
+  if (status.type === 'error') {
+    return (
+      <div className="settings-status settings-status-error">
+        <AlertCircle size={13} />
+        <span>{status.message}</span>
+      </div>
+    );
+  }
+
+  const { added, skipped, failed } = status.result;
+  const hasFailures = failed.length > 0;
+  const allFailed = added === 0 && skipped === 0 && hasFailures;
+
+  return (
+    <div className="import-result">
+      {/* Summary row */}
+      <div className={`import-result-summary ${allFailed ? 'import-result-summary--error' : 'import-result-summary--success'}`}>
+        {allFailed ? <AlertCircle size={13} /> : <CheckCircle size={13} />}
+        <div className="import-result-counts">
+          {added > 0 && (
+            <span className="import-count import-count--added">{added} added</span>
+          )}
+          {skipped > 0 && (
+            <span className="import-count import-count--skipped">{skipped} skipped</span>
+          )}
+          {hasFailures && (
+            <span className="import-count import-count--failed">{failed.length} failed</span>
+          )}
+        </div>
+        {hasFailures && (
+          <button
+            className="import-failures-toggle"
+            onClick={() => setFailuresExpanded(v => !v)}
+            aria-expanded={failuresExpanded}
+          >
+            {failuresExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            {failuresExpanded ? 'Hide' : 'Show'} failures
+          </button>
+        )}
+      </div>
+
+      {/* Failures list */}
+      {hasFailures && failuresExpanded && (
+        <ul className="import-failures-list">
+          {failed.map((f, i) => (
+            <li key={i} className="import-failure-item">
+              <div className="import-failure-title">{f.title || f.url}</div>
+              <div className="import-failure-url">{f.url}</div>
+              <div className="import-failure-reason">{f.reason}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ExportStatusBadge({ status }: { status: ExportStatus }) {
   if (status.type === 'idle' || status.type === 'loading') return null;
 
   if (status.type === 'success') {

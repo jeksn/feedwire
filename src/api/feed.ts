@@ -1,6 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { Feed, Article } from '../types';
 
+export interface FailedFeed {
+  url: string;
+  title: string;
+  reason: string;
+}
+
+export interface ImportResult {
+  added: number;
+  skipped: number;
+  failed: FailedFeed[];
+}
+
 export const feedApi = {
   // Feed operations
   addFeed: async (url: string): Promise<Feed> => {
@@ -64,7 +76,7 @@ export const feedApi = {
     return await invoke('export_opml');
   },
 
-  importOpml: async (): Promise<string> => {
+  importOpml: async (): Promise<ImportResult> => {
     return await invoke('import_opml');
   },
 };

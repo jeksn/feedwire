@@ -113,7 +113,7 @@ function App() {
     setSelectedView('settings');
   };
 
-  const handleImportOpml = async (): Promise<string> => {
+  const handleImportOpml = async () => {
     const result = await feedApi.importOpml();
     // Refresh feeds list after import
     await loadFeeds();

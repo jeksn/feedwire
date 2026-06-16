@@ -284,10 +284,24 @@ pub async fn export_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct ImportResult {
+    pub added: usize,
+    pub skipped: usize,
+    pub failed: Vec<FailedFeed>,
+}
+
+#[derive(serde::Serialize)]
+pub struct FailedFeed {
+    pub url: String,
+    pub title: String,
+    pub reason: String,
+}
+
 /// Import feeds from an OPML file — opens a native open dialog, then adds each
 /// feed URL (skipping duplicates and failed ones gracefully).
 #[tauri::command]
-pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Result<String, String> {
+pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Result<ImportResult, String> {
     // Open native file picker
     let path = app
         .dialog()
@@ -311,9 +325,9 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
     }
 
     let parser = FeedParser::new();
-    let mut imported = 0usize;
+    let mut added = 0usize;
     let mut skipped = 0usize;
-    let mut failed = 0usize;
+    let mut failed: Vec<FailedFeed> = Vec::new();
 
     for opml_feed in opml_feeds {
         // Check duplicate by URL before attempting network fetch
@@ -334,7 +348,11 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
                 Ok(u) => u,
                 Err(e) => {
                     eprintln!("OPML import: YouTube conversion failed for {}: {}", opml_feed.url, e);
-                    failed += 1;
+                    failed.push(FailedFeed {
+                        url: opml_feed.url.clone(),
+                        title: opml_feed.title.clone(),
+                        reason: format!("Could not convert YouTube URL: {}", e),
+                    });
                     continue;
                 }
             }
@@ -347,7 +365,11 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
             Ok(f) => f,
             Err(e) => {
                 eprintln!("OPML import: discovery failed for {}: {}", final_url, e);
-                failed += 1;
+                failed.push(FailedFeed {
+                    url: final_url.clone(),
+                    title: opml_feed.title.clone(),
+                    reason: format!("Could not fetch feed: {}", e),
+                });
                 continue;
             }
         };
@@ -364,7 +386,11 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
                 Ok(f) => f,
                 Err(e) => {
                     eprintln!("OPML import: DB save failed for {}: {}", final_url, e);
-                    failed += 1;
+                    failed.push(FailedFeed {
+                        url: final_url.clone(),
+                        title: opml_feed.title.clone(),
+                        reason: format!("Database error: {}", e),
+                    });
                     continue;
                 }
             }
@@ -375,13 +401,10 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
             eprintln!("OPML import: initial article fetch failed for {}: {}", feed.id, e);
         }
 
-        imported += 1;
+        added += 1;
     }
 
-    Ok(format!(
-        "Import complete: {} added, {} skipped (duplicates), {} failed",
-        imported, skipped, failed
-    ))
+    Ok(ImportResult { added, skipped, failed })
 }
 
 impl Default for FeedUpdate {

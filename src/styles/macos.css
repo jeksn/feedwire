@@ -836,3 +836,127 @@ body {
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
 }
+
+/* ── Import Result ── */
+.import-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.import-result-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.import-result-summary--success {
+  color: var(--macos-success);
+  background-color: rgba(52, 199, 89, 0.08);
+}
+
+.import-result-summary--error {
+  color: var(--macos-error);
+  background-color: rgba(255, 59, 48, 0.08);
+}
+
+.import-result-counts {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.import-count {
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.import-count--added {
+  background-color: rgba(52, 199, 89, 0.12);
+  color: var(--macos-success);
+}
+
+.import-count--skipped {
+  background-color: rgba(142, 142, 147, 0.12);
+  color: var(--macos-text-secondary);
+}
+
+.import-count--failed {
+  background-color: rgba(255, 59, 48, 0.12);
+  color: var(--macos-error);
+}
+
+.import-failures-toggle {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--macos-text-secondary);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.import-failures-toggle:hover {
+  color: var(--macos-text-primary);
+  background-color: var(--macos-bg-secondary);
+}
+
+.import-failures-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.import-failure-item {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--macos-bg-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-failure-item + .import-failure-item {
+  border-top: 1px solid var(--macos-border);
+}
+
+.import-failure-title {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--macos-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-failure-url {
+  font-size: 10px;
+  color: var(--macos-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono, monospace);
+}
+
+.import-failure-reason {
+  font-size: 11px;
+  color: var(--macos-error);
+}
