@@ -233,3 +233,74 @@ impl Default for FeedParser {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── is_youtube_channel ──────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn youtube_channel_url_detected() {
+        let parser = FeedParser::new();
+        assert!(parser.is_youtube_channel("https://www.youtube.com/channel/UC1234").await);
+        assert!(parser.is_youtube_channel("https://www.youtube.com/@SomeHandle").await);
+        assert!(parser.is_youtube_channel("https://youtu.be/abc123").await);
+        assert!(parser.is_youtube_channel("https://www.youtube.com/feeds/videos.xml?channel_id=UC123").await);
+    }
+
+    #[tokio::test]
+    async fn non_youtube_url_not_detected() {
+        let parser = FeedParser::new();
+        assert!(!parser.is_youtube_channel("https://news.ycombinator.com/rss").await);
+        assert!(!parser.is_youtube_channel("https://example.com/feed.xml").await);
+    }
+
+    // ── convert_youtube_to_rss ─────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn already_rss_url_passthrough() {
+        let parser = FeedParser::new();
+        let url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx";
+        let result = parser.convert_youtube_to_rss(url).await.unwrap();
+        assert_eq!(result, url);
+    }
+
+    #[tokio::test]
+    async fn channel_path_converted() {
+        let parser = FeedParser::new();
+        let url = "https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx";
+        let result = parser.convert_youtube_to_rss(url).await.unwrap();
+        assert_eq!(
+            result,
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx"
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_url_returns_error() {
+        let parser = FeedParser::new();
+        let result = parser.convert_youtube_to_rss("not-a-url").await;
+        assert!(result.is_err());
+    }
+
+    // ── validate_feed_url ──────────────────────────────────────────────────
+
+    #[test]
+    fn valid_http_url_accepted() {
+        assert!(FeedParser::validate_feed_url("https://example.com/feed.xml").is_ok());
+        assert!(FeedParser::validate_feed_url("http://example.com/rss").is_ok());
+    }
+
+    #[test]
+    fn non_http_scheme_rejected() {
+        assert!(FeedParser::validate_feed_url("ftp://example.com/feed").is_err());
+        assert!(FeedParser::validate_feed_url("file:///etc/passwd").is_err());
+    }
+
+    #[test]
+    fn invalid_url_rejected() {
+        assert!(FeedParser::validate_feed_url("not-a-url").is_err());
+        assert!(FeedParser::validate_feed_url("").is_err());
+    }
+}

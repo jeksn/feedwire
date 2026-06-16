@@ -18,16 +18,18 @@ pub struct Database {
 
 impl Database {
     pub async fn new() -> Result<Self, DatabaseError> {
-        let database_url = "sqlite:./feedwire.db";
-        
-        let connect_options = SqliteConnectOptions::from_str(database_url)?
+        Self::with_url("sqlite:./feedwire.db").await
+    }
+
+    pub async fn with_url(url: &str) -> Result<Self, DatabaseError> {
+        let connect_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true);
-        
+
         let pool = SqlitePool::connect_with(connect_options).await?;
-        
+
         let db = Self { pool };
         db.migrate().await?;
-        
+
         Ok(db)
     }
 
