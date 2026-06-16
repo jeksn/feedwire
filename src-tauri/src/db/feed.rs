@@ -129,6 +129,13 @@ impl FeedParser {
 
         if let Some(domain) = parsed_url.domain() {
             if domain.contains("youtube.com") {
+                // Already an RSS feed URL — return as-is.
+                // Handles: /feeds/videos.xml?channel_id=... and /feeds/videos.xml?user=...
+                if parsed_url.path().starts_with("/feeds/") {
+                    println!("URL is already a YouTube RSS feed: {}", url);
+                    return Ok(url.to_string());
+                }
+
                 if let Some(path) = parsed_url.path_segments() {
                     let path_segments: Vec<_> = path.collect();
 
@@ -147,6 +154,16 @@ impl FeedParser {
                                 return self.resolve_youtube_custom_url(channel_name).await;
                             }
                         }
+                    }
+                }
+
+                // Try extracting a channel_id from query params directly
+                // e.g. a bare https://www.youtube.com?channel_id=UCxxxx URL
+                for (key, val) in parsed_url.query_pairs() {
+                    if key == "channel_id" && !val.is_empty() {
+                        let rss_url = format!("https://www.youtube.com/feeds/videos.xml?channel_id={}", val);
+                        println!("Converted YouTube channel_id query param to RSS: {}", rss_url);
+                        return Ok(rss_url);
                     }
                 }
             }
