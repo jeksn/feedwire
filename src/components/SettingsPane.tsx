@@ -129,8 +129,8 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
                   <span className="settings-action-title">Import OPML</span>
                 </div>
                 <p className="settings-action-description">
-                  Load subscriptions from an .opml file. Existing feeds are skipped
-                  automatically.
+                  Load subscriptions from an .opml file. Feeds already in your
+                  library are left untouched.
                 </p>
               </div>
               <button
@@ -269,7 +269,7 @@ function ImportStatusDisplay({ status }: { status: ImportStatus }) {
             <span className="import-count import-count--added">{added} added</span>
           )}
           {skipped > 0 && (
-            <span className="import-count import-count--skipped">{skipped} skipped</span>
+            <span className="import-count import-count--skipped">{skipped} already in library</span>
           )}
           {hasFailures && (
             <span className="import-count import-count--failed">{failed.length} failed</span>
