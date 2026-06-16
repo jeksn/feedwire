@@ -17,10 +17,14 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn new() -> Result<Self, DatabaseError> {
-        Self::with_url("sqlite:./feedwire.db").await
+    /// Open the database at a specific filesystem path.
+    /// The parent directory must already exist.
+    pub async fn open(path: &std::path::Path) -> Result<Self, DatabaseError> {
+        let url = format!("sqlite:{}", path.display());
+        Self::with_url(&url).await
     }
 
+    /// Open using a raw SQLite connection string (used by tests with `sqlite::memory:`).
     pub async fn with_url(url: &str) -> Result<Self, DatabaseError> {
         let connect_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true);

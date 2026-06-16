@@ -7,7 +7,7 @@ mod opml;
 use db::{Database, commands::DbState};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tauri::Manager;
+use tauri::{Listener, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,10 +15,26 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            // Initialize database - use tokio::main runtime instead of creating a new one
+            // Resolve the database path:
+            //   - Debug builds: project-local `feedwire.db` (convenient for development)
+            //   - Release builds: `~/Library/Application Support/<identifier>/feedwire.db`
+            //     This is stable across app updates and won't change between builds.
+            let db_path = if cfg!(debug_assertions) {
+                std::path::PathBuf::from("feedwire.db")
+            } else {
+                let data_dir = app.path().app_data_dir()
+                    .expect("Could not resolve app data directory");
+                std::fs::create_dir_all(&data_dir)
+                    .expect("Could not create app data directory");
+                data_dir.join("feedwire.db")
+            };
+
+            println!("Database path: {}", db_path.display());
+
+            // Initialize database
             let app_handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
-                match Database::new().await {
+                match Database::open(&db_path).await {
                     Ok(database) => {
                         app_handle.manage(Arc::new(Mutex::new(database)) as DbState);
                         Ok(())
@@ -28,7 +44,30 @@ pub fn run() {
                         Err(Box::new(e) as Box<dyn std::error::Error>)
                     }
                 }
-            })
+            })?;
+
+            // Show the window once the page has loaded. We listen for the
+            // frontend-emitted "app-ready" event, with a fallback timer so
+            // the window always appears even if the event is never fired.
+            if let Some(window) = app.get_webview_window("main") {
+                let window_for_event = window.clone();
+                let window_for_timer = window.clone();
+
+                // Fallback: show after 2s regardless
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+                    let _ = window_for_timer.show();
+                    let _ = window_for_timer.set_focus();
+                });
+
+                // Primary: show as soon as frontend signals it's ready
+                window.listen("app-ready", move |_| {
+                    let _ = window_for_event.show();
+                    let _ = window_for_event.set_focus();
+                });
+            }
+
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             db::commands::add_feed,

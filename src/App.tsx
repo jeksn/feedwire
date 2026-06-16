@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { emit } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/Sidebar";
 import { ArticleList } from "./components/ArticleList";
 import { ContentPane } from "./components/ContentPane";
@@ -21,6 +22,13 @@ function App() {
   const [showAddFeedDialog, setShowAddFeedDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+
+  // Signal the Rust backend that the React tree has mounted and the window
+  // can be made visible. Runs after first paint, so the user never sees a
+  // blank frame. Errors are ignored in non-Tauri environments (tests, browser).
+  useEffect(() => {
+    emit("app-ready").catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadFeeds();
