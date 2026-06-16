@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Plus, RefreshCw, Rss, Trash2, Bookmark, Inbox, Settings } from 'lucide-react';
+import { Plus, RefreshCw, Rss, Bookmark, Inbox, Settings } from 'lucide-react';
 import type { Feed } from '../types';
 
 interface SidebarProps {
@@ -13,7 +12,6 @@ interface SidebarProps {
   onSettingsSelect: () => void;
   onAddFeed: () => void;
   onRefreshAll: () => void;
-  onDeleteFeed: (feedId: string) => void;
   loading: boolean;
 }
 
@@ -28,25 +26,9 @@ export function Sidebar({
   onSettingsSelect,
   onAddFeed,
   onRefreshAll,
-  onDeleteFeed,
   loading
 }: SidebarProps) {
-  const [hoveredFeedId, setHoveredFeedId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
-
-  const handleDeleteClick = (e: React.MouseEvent, feedId: string) => {
-    e.stopPropagation();
-    if (confirmDeleteId === feedId) {
-      onDeleteFeed(feedId);
-      setConfirmDeleteId(null);
-    } else {
-      setConfirmDeleteId(feedId);
-      // Auto-cancel confirmation after 3s
-      setTimeout(() => setConfirmDeleteId(null), 3000);
-    }
-  };
 
   return (
     <div className="sidebar">
@@ -134,31 +116,13 @@ export function Sidebar({
               key={feed.id}
               className={`list-item ${selectedView === 'feed' && selectedFeed?.id === feed.id ? 'active' : ''}`}
               onClick={() => onFeedSelect(feed)}
-              onMouseEnter={() => setHoveredFeedId(feed.id)}
-              onMouseLeave={() => { setHoveredFeedId(null); setConfirmDeleteId(null); }}
             >
               <div className="feed-item">
                 <div className="feed-title truncate">{feed.title}</div>
-                <div className="flex items-center gap-xs">
-                  {unreadCounts[feed.id] > 0 && (
-                    <span className="feed-unread-count">{unreadCounts[feed.id]}</span>
-                  )}
-                  {(hoveredFeedId === feed.id || confirmDeleteId === feed.id) && (
-                    <button
-                      className={`btn btn-icon btn-ghost feed-delete-btn ${confirmDeleteId === feed.id ? 'feed-delete-confirm' : ''}`}
-                      onClick={(e) => handleDeleteClick(e, feed.id)}
-                      title={confirmDeleteId === feed.id ? 'Click again to confirm delete' : 'Delete feed'}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </div>
+                {unreadCounts[feed.id] > 0 && (
+                  <span className="feed-unread-count">{unreadCounts[feed.id]}</span>
+                )}
               </div>
-              {feed.description && (
-                <div className="text-xs text-secondary truncate mt-xs">
-                  {feed.description}
-                </div>
-              )}
             </div>
           ))
         )}

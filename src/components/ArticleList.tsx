@@ -1,4 +1,4 @@
-import { RefreshCw, ExternalLink, CheckCheck } from 'lucide-react';
+import { RefreshCw, ExternalLink, CheckCheck, Trash2 } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
 
@@ -11,6 +11,7 @@ interface ArticleListProps {
   title?: string;
   onRefreshFeed: () => void;
   onMarkAllRead?: () => void;
+  onDeleteFeed?: () => void;
 }
 
 export function ArticleList({
@@ -21,7 +22,8 @@ export function ArticleList({
   selectedFeed,
   title,
   onRefreshFeed,
-  onMarkAllRead
+  onMarkAllRead,
+  onDeleteFeed
 }: ArticleListProps) {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
@@ -58,11 +60,11 @@ export function ArticleList({
   return (
     <div className="article-list">
       <div className="header">
-        <div className="flex items-center justify-between gap-x-4">
-          <h2 className="font-semibold">
+        <div className="article-list-header-row">
+          <h2 className="font-semibold truncate article-list-title">
             {title ?? (selectedFeed ? selectedFeed.title : 'All Articles')}
           </h2>
-          <div className="flex gap-2">
+          <div className="article-list-actions">
             {onMarkAllRead && articles.some(a => !a.is_read) && (
               <button
                 className="btn btn-icon btn-ghost"
@@ -81,6 +83,16 @@ export function ArticleList({
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
+            {onDeleteFeed && (
+              <button
+                className="btn btn-icon btn-ghost"
+                onClick={onDeleteFeed}
+                disabled={loading}
+                title="Delete feed"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
         </div>
       </div>

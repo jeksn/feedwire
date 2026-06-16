@@ -268,7 +268,6 @@ function App() {
         onSettingsSelect={handleSettingsSelect}
         onAddFeed={() => setShowAddFeedDialog(true)}
         onRefreshAll={handleRefreshAll}
-        onDeleteFeed={handleDeleteFeed}
         loading={loading}
       />
 
@@ -289,6 +288,7 @@ function App() {
             title={articleListTitle}
             onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
             onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
+            onDeleteFeed={selectedView === 'feed' && selectedFeed ? () => handleDeleteFeed(selectedFeed.id) : undefined}
           />
 
           <ContentPane
