@@ -223,6 +223,36 @@ async fn mark_all_read_global() {
     assert_eq!(unread, 0);
 }
 
+// ── create_or_reactivate_feed ──────────────────────────────────────────────
+
+#[tokio::test]
+async fn reactivate_soft_deleted_feed() {
+    let db = test_db().await;
+    let feed = db.create_feed(new_feed("Feed", "https://example.com/rss")).await.unwrap();
+
+    db.delete_feed(&feed.id).await.unwrap();
+    // Feed is now soft-deleted; active list should be empty
+    assert!(db.get_feeds().await.unwrap().is_empty());
+
+    // Re-adding the same URL should reactivate it
+    let reactivated = db.create_or_reactivate_feed(new_feed("Feed Updated", "https://example.com/rss")).await.unwrap();
+    assert_eq!(reactivated.id, feed.id, "should reuse existing row");
+    assert!(reactivated.is_active);
+    assert_eq!(reactivated.title, "Feed Updated");
+
+    let active = db.get_feeds().await.unwrap();
+    assert_eq!(active.len(), 1);
+}
+
+#[tokio::test]
+async fn create_or_reactivate_returns_duplicate_for_active_feed() {
+    let db = test_db().await;
+    db.create_feed(new_feed("Feed", "https://example.com/rss")).await.unwrap();
+
+    let result = db.create_or_reactivate_feed(new_feed("Feed 2", "https://example.com/rss")).await;
+    assert!(matches!(result, Err(crate::db::DatabaseError::DuplicateUrl)));
+}
+
 // ── Cascade delete ─────────────────────────────────────────────────────────
 
 #[tokio::test]

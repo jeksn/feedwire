@@ -10,6 +10,8 @@ pub enum DatabaseError {
     FeedNotFound,
     #[error("Article not found")]
     ArticleNotFound,
+    #[error("Feed already exists")]
+    DuplicateUrl,
 }
 
 pub struct Database {
@@ -182,6 +184,46 @@ impl Database {
         q.execute(&self.pool).await?;
 
         self.get_feed_by_id(id).await
+    }
+
+    /// Look up a feed by URL regardless of its active/inactive state.
+    pub async fn get_feed_by_url(&self, url: &str) -> Result<Option<Feed>, DatabaseError> {
+        let feed = sqlx::query_as::<_, Feed>(
+            "SELECT * FROM feeds WHERE url = ? LIMIT 1"
+        )
+        .bind(url)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(feed)
+    }
+
+    /// Insert a new feed, or reactivate and update an existing (soft-deleted) one
+    /// with the same URL.  Returns the final feed row either way.
+    pub async fn create_or_reactivate_feed(&self, feed: NewFeed) -> Result<Feed, DatabaseError> {
+        // Check whether a row with this URL already exists (active or not)
+        if let Some(existing) = self.get_feed_by_url(&feed.url).await? {
+            if existing.is_active {
+                // Already active — treat as duplicate
+                return Err(DatabaseError::DuplicateUrl);
+            }
+            // Reactivate the existing row with fresh metadata
+            let now = chrono::Utc::now().to_rfc3339();
+            sqlx::query(
+                "UPDATE feeds SET title = ?, description = ?, is_active = 1, updated_at = ? WHERE id = ?"
+            )
+            .bind(&feed.title)
+            .bind(&feed.description)
+            .bind(&now)
+            .bind(&existing.id)
+            .execute(&self.pool)
+            .await?;
+
+            return self.get_feed_by_id(&existing.id).await;
+        }
+
+        // No existing row — regular insert
+        self.create_feed(feed).await
     }
 
     pub async fn delete_feed(&self, id: &str) -> Result<(), DatabaseError> {

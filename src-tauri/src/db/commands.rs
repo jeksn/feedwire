@@ -32,20 +32,16 @@ pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<crate::db::
     
     println!("Final URL to fetch: {}", final_url);
     
-    // Check for duplicates — brief lock, released immediately after the check
+    // Check for active duplicates — brief lock, released before any network I/O
     {
         let db_guard = db.lock().await;
-        let existing_feeds = db_guard.get_feeds().await.map_err(|e| {
-            println!("Failed to check existing feeds: {}", e);
-            e.to_string()
-        })?;
-        for existing in existing_feeds {
-            if existing.url == final_url {
+        if let Some(existing) = db_guard.get_feed_by_url(&final_url).await.map_err(|e| e.to_string())? {
+            if existing.is_active {
                 println!("Feed already exists: {}", existing.title);
                 return Err("Feed already exists".to_string());
             }
         }
-    } // lock released before any network I/O
+    }
 
     // Discover feed metadata — no lock held during the network call
     let new_feed = parser.discover_feed(&final_url).await.map_err(|e| {
@@ -54,10 +50,10 @@ pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<crate::db::
     })?;
     println!("Feed discovered: {}", new_feed.title);
 
-    // Persist — brief lock just for the DB write
+    // Persist — reactivates soft-deleted rows, inserts new ones
     let feed = {
         let db_guard = db.lock().await;
-        let feed = db_guard.create_feed(new_feed).await.map_err(|e| {
+        let feed = db_guard.create_or_reactivate_feed(new_feed).await.map_err(|e| {
             println!("Database save failed: {}", e);
             e.to_string()
         })?;
@@ -336,14 +332,17 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
     let mut failed: Vec<FailedFeed> = Vec::new();
 
     for opml_feed in opml_feeds {
-        // Check duplicate by URL before attempting network fetch
-        let already_exists = {
+        // Skip only if an active feed with this URL already exists
+        let already_active = {
             let db_guard = db.lock().await;
-            let existing = db_guard.get_feeds().await.unwrap_or_default();
-            existing.iter().any(|f| f.url == opml_feed.url)
+            db_guard.get_feed_by_url(&opml_feed.url).await
+                .ok()
+                .flatten()
+                .map(|f| f.is_active)
+                .unwrap_or(false)
         };
 
-        if already_exists {
+        if already_active {
             skipped += 1;
             continue;
         }
@@ -380,16 +379,17 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
             }
         };
 
-        // Persist — brief lock, re-check duplicate race-safely before writing
+        // Persist — reactivates soft-deleted rows, inserts new ones.
+        // Race-safe: create_or_reactivate_feed returns DuplicateUrl if
+        // another concurrent insert beat us to it.
         let feed = {
             let db_guard = db.lock().await;
-            let existing = db_guard.get_feeds().await.unwrap_or_default();
-            if existing.iter().any(|f| f.url == final_url) {
-                skipped += 1;
-                continue;
-            }
-            match db_guard.create_feed(new_feed).await {
+            match db_guard.create_or_reactivate_feed(new_feed).await {
                 Ok(f) => f,
+                Err(crate::db::DatabaseError::DuplicateUrl) => {
+                    skipped += 1;
+                    continue;
+                }
                 Err(e) => {
                     eprintln!("OPML import: DB save failed for {}: {}", final_url, e);
                     failed.push(FailedFeed {
