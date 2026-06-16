@@ -210,10 +210,13 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
     let db = db.lock().await;
     let feed = db.get_feed_by_id(&feed_id).await?;
     
+    const MAX_INITIAL_ARTICLES: usize = 15;
+
     let parser = FeedParser::new();
     let (_, articles) = parser.fetch_feed(&feed.url).await?;
-    
-    for mut article in articles {
+
+    // Feeds are typically ordered newest-first; take at most the latest 15.
+    for mut article in articles.into_iter().take(MAX_INITIAL_ARTICLES) {
         article.feed_id = feed_id.clone();
         db.create_article(article).await?;
     }
