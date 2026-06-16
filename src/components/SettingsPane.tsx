@@ -1,0 +1,151 @@
+import { useState } from 'react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+
+interface SettingsPaneProps {
+  feedCount: number;
+  onImport: () => Promise<string>;
+  onExport: () => Promise<string>;
+}
+
+type Status = { type: 'idle' } | { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
+
+export function SettingsPane({ feedCount, onImport, onExport }: SettingsPaneProps) {
+  const [importStatus, setImportStatus] = useState<Status>({ type: 'idle' });
+  const [exportStatus, setExportStatus] = useState<Status>({ type: 'idle' });
+
+  const handleImport = async () => {
+    setImportStatus({ type: 'loading' });
+    try {
+      const message = await onImport();
+      setImportStatus({ type: 'success', message });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Treat "cancelled" as a non-error
+      if (msg.toLowerCase().includes('cancel')) {
+        setImportStatus({ type: 'idle' });
+      } else {
+        setImportStatus({ type: 'error', message: msg });
+      }
+    }
+  };
+
+  const handleExport = async () => {
+    setExportStatus({ type: 'loading' });
+    try {
+      const message = await onExport();
+      setExportStatus({ type: 'success', message });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.toLowerCase().includes('cancel')) {
+        setExportStatus({ type: 'idle' });
+      } else {
+        setExportStatus({ type: 'error', message: msg });
+      }
+    }
+  };
+
+  return (
+    <div className="settings-pane">
+      <div className="settings-header">
+        <h2 className="settings-title">Settings</h2>
+      </div>
+
+      <div className="settings-body">
+        {/* Import / Export section */}
+        <section className="settings-section">
+          <h3 className="settings-section-title">Import & Export</h3>
+          <p className="settings-section-description">
+            Use OPML to transfer your subscriptions between RSS readers. OPML is
+            supported by NetNewsWire, Reeder, Feedly, Miniflux, and virtually all
+            other feed readers.
+          </p>
+
+          <div className="settings-actions">
+            {/* Import */}
+            <div className="settings-action-card">
+              <div className="settings-action-info">
+                <div className="flex items-center gap-sm">
+                  <Upload size={18} className="text-accent" />
+                  <span className="settings-action-title">Import OPML</span>
+                </div>
+                <p className="settings-action-description">
+                  Load subscriptions from an .opml file. Existing feeds are skipped
+                  automatically.
+                </p>
+              </div>
+              <button
+                className="btn btn-secondary settings-action-btn"
+                onClick={handleImport}
+                disabled={importStatus.type === 'loading'}
+              >
+                {importStatus.type === 'loading' ? (
+                  <Loader size={14} className="animate-spin" />
+                ) : (
+                  <Upload size={14} />
+                )}
+                Import
+              </button>
+              <StatusBadge status={importStatus} />
+            </div>
+
+            {/* Export */}
+            <div className="settings-action-card">
+              <div className="settings-action-info">
+                <div className="flex items-center gap-sm">
+                  <Download size={18} className="text-accent" />
+                  <span className="settings-action-title">Export OPML</span>
+                </div>
+                <p className="settings-action-description">
+                  Save all {feedCount} {feedCount === 1 ? 'feed' : 'feeds'} to an
+                  .opml file you can import into any other reader.
+                </p>
+              </div>
+              <button
+                className="btn btn-secondary settings-action-btn"
+                onClick={handleExport}
+                disabled={exportStatus.type === 'loading' || feedCount === 0}
+              >
+                {exportStatus.type === 'loading' ? (
+                  <Loader size={14} className="animate-spin" />
+                ) : (
+                  <Download size={14} />
+                )}
+                Export
+              </button>
+              <StatusBadge status={exportStatus} />
+            </div>
+          </div>
+        </section>
+
+        {/* About section */}
+        <section className="settings-section">
+          <h3 className="settings-section-title">About</h3>
+          <div className="settings-about">
+            <p className="text-sm text-secondary">FeedWire — a minimal RSS reader</p>
+            <p className="text-xs text-secondary" style={{ marginTop: 4 }}>Version 0.1.0</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: Status }) {
+  if (status.type === 'idle' || status.type === 'loading') return null;
+
+  if (status.type === 'success') {
+    return (
+      <div className="settings-status settings-status-success">
+        <CheckCircle size={13} />
+        <span>{status.message}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="settings-status settings-status-error">
+      <AlertCircle size={13} />
+      <span>{status.message}</span>
+    </div>
+  );
+}

@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod db;
+mod opml;
 
 use db::{Database, commands::DbState};
 use std::sync::Arc;
@@ -12,13 +13,22 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            // Initialize database synchronously
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-            let database = rt.block_on(Database::new()).expect("Failed to initialize database");
-            
-            app.manage(Arc::new(Mutex::new(database)) as DbState);
-            Ok(())
+            // Initialize database - use tokio::main runtime instead of creating a new one
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::block_on(async move {
+                match Database::new().await {
+                    Ok(database) => {
+                        app_handle.manage(Arc::new(Mutex::new(database)) as DbState);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to initialize database: {:?}", e);
+                        Err(Box::new(e) as Box<dyn std::error::Error>)
+                    }
+                }
+            })
         })
         .invoke_handler(tauri::generate_handler![
             db::commands::add_feed,
@@ -34,6 +44,8 @@ pub fn run() {
             db::commands::refresh_feed,
             db::commands::refresh_all_feeds,
             db::commands::get_unread_count,
+            db::commands::export_opml,
+            db::commands::import_opml,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Plus, RefreshCw, Rss, Trash2, Bookmark, Inbox } from 'lucide-react';
+import { Plus, RefreshCw, Rss, Trash2, Bookmark, Inbox, Settings } from 'lucide-react';
 import type { Feed } from '../types';
 
 interface SidebarProps {
   feeds: Feed[];
   selectedFeed: Feed | null;
-  selectedView: 'feed' | 'unread' | 'bookmarks';
+  selectedView: 'feed' | 'unread' | 'bookmarks' | 'settings';
   unreadCounts: Record<string, number>;
   onFeedSelect: (feed: Feed) => void;
   onUnreadSelect: () => void;
   onBookmarksSelect: () => void;
+  onSettingsSelect: () => void;
   onAddFeed: () => void;
   onRefreshAll: () => void;
   onDeleteFeed: (feedId: string) => void;
@@ -24,6 +25,7 @@ export function Sidebar({
   onFeedSelect,
   onUnreadSelect,
   onBookmarksSelect,
+  onSettingsSelect,
   onAddFeed,
   onRefreshAll,
   onDeleteFeed,
@@ -81,7 +83,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="list">
+      <div className="sidebar-nav">
         {/* Unread section */}
         <div
           className={`list-item ${selectedView === 'unread' ? 'active' : ''}`}
@@ -110,9 +112,11 @@ export function Sidebar({
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="sidebar-section-divider" />
+      <div className="sidebar-section-divider" />
 
+      <div className="list">
         {feeds.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">📡</div>
@@ -158,6 +162,22 @@ export function Sidebar({
             </div>
           ))
         )}
+      </div>
+
+      {/* Settings pinned at bottom */}
+      <div className="sidebar-footer">
+        <div className="sidebar-section-divider" />
+        <div
+          className={`list-item ${selectedView === 'settings' ? 'active' : ''}`}
+          onClick={onSettingsSelect}
+        >
+          <div className="feed-item">
+            <div className="flex items-center gap-sm feed-title">
+              <Settings size={14} />
+              <span>Settings</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

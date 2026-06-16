@@ -1,5 +1,7 @@
 use crate::db::{Database, FeedParser, FeedUpdate, ArticleUpdate};
+use crate::opml;
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -228,6 +230,148 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
 
 async fn refresh_feed_helper(feed_id: String, db: Arc<Mutex<Database>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     fetch_feed_articles(feed_id, db).await
+}
+
+/// Export all feeds as an OPML 2.0 file — opens a native save dialog.
+#[tauri::command]
+pub async fn export_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Result<String, String> {
+    // Collect feeds
+    let feeds: Vec<(String, String)> = {
+        let db_guard = db.lock().await;
+        db_guard
+            .get_feeds()
+            .await
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|f| (f.title, f.url))
+            .collect()
+    };
+
+    if feeds.is_empty() {
+        return Err("No feeds to export".to_string());
+    }
+
+    let xml = opml::export_opml(&feeds);
+
+    // Open native save dialog
+    let path = app
+        .dialog()
+        .file()
+        .set_title("Export OPML")
+        .set_file_name("feedwire-subscriptions.opml")
+        .add_filter("OPML Files", &["opml", "xml"])
+        .blocking_save_file();
+
+    match path {
+        Some(fp) => {
+            let path_buf = fp.as_path()
+                .ok_or_else(|| "Invalid save path".to_string())?
+                .to_path_buf();
+            std::fs::write(&path_buf, xml).map_err(|e| e.to_string())?;
+            Ok(format!("Exported {} feeds to {}", feeds.len(), path_buf.display()))
+        }
+        None => Err("Export cancelled".to_string()),
+    }
+}
+
+/// Import feeds from an OPML file — opens a native open dialog, then adds each
+/// feed URL (skipping duplicates and failed ones gracefully).
+#[tauri::command]
+pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Result<String, String> {
+    // Open native file picker
+    let path = app
+        .dialog()
+        .file()
+        .set_title("Import OPML")
+        .add_filter("OPML Files", &["opml", "xml"])
+        .blocking_pick_file();
+
+    let file_path = match path {
+        Some(fp) => fp.as_path()
+            .ok_or_else(|| "Invalid file path".to_string())?
+            .to_path_buf(),
+        None => return Err("Import cancelled".to_string()),
+    };
+
+    let xml = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+    let opml_feeds = opml::import_opml(&xml).map_err(|e| e.to_string())?;
+
+    if opml_feeds.is_empty() {
+        return Err("No feeds found in OPML file".to_string());
+    }
+
+    let parser = FeedParser::new();
+    let mut imported = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+
+    for opml_feed in opml_feeds {
+        // Check duplicate by URL before attempting network fetch
+        let already_exists = {
+            let db_guard = db.lock().await;
+            let existing = db_guard.get_feeds().await.unwrap_or_default();
+            existing.iter().any(|f| f.url == opml_feed.url)
+        };
+
+        if already_exists {
+            skipped += 1;
+            continue;
+        }
+
+        // Validate and try to discover the feed
+        let final_url = if parser.is_youtube_channel(&opml_feed.url).await {
+            match parser.convert_youtube_to_rss(&opml_feed.url).await {
+                Ok(u) => u,
+                Err(e) => {
+                    eprintln!("OPML import: YouTube conversion failed for {}: {}", opml_feed.url, e);
+                    failed += 1;
+                    continue;
+                }
+            }
+        } else {
+            opml_feed.url.clone()
+        };
+
+        // Discover and save feed
+        let feed = {
+            let db_guard = db.lock().await;
+
+            // Re-check duplicate after acquiring lock (race-safe)
+            let existing = db_guard.get_feeds().await.unwrap_or_default();
+            if existing.iter().any(|f| f.url == final_url) {
+                skipped += 1;
+                continue;
+            }
+
+            match parser.discover_feed(&final_url).await {
+                Ok(new_feed) => match db_guard.create_feed(new_feed).await {
+                    Ok(f) => f,
+                    Err(e) => {
+                        eprintln!("OPML import: DB save failed for {}: {}", final_url, e);
+                        failed += 1;
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    eprintln!("OPML import: discovery failed for {}: {}", final_url, e);
+                    failed += 1;
+                    continue;
+                }
+            }
+        };
+
+        // Fetch initial articles in background (non-fatal if this fails)
+        if let Err(e) = fetch_feed_articles(feed.id.clone(), db.inner().clone()).await {
+            eprintln!("OPML import: initial article fetch failed for {}: {}", feed.id, e);
+        }
+
+        imported += 1;
+    }
+
+    Ok(format!(
+        "Import complete: {} added, {} skipped (duplicates), {} failed",
+        imported, skipped, failed
+    ))
 }
 
 impl Default for FeedUpdate {

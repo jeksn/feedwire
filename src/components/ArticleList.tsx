@@ -58,11 +58,11 @@ export function ArticleList({
   return (
     <div className="article-list">
       <div className="header">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-x-4">
           <h2 className="font-semibold">
             {title ?? (selectedFeed ? selectedFeed.title : 'All Articles')}
           </h2>
-          <div className="flex gap-xs">
+          <div className="flex gap-2">
             {onMarkAllRead && articles.some(a => !a.is_read) && (
               <button
                 className="btn btn-icon btn-ghost"

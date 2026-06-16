@@ -57,6 +57,7 @@ body {
   font-size: var(--font-size-base);
   color: var(--macos-text-primary);
   background-color: var(--macos-bg-primary);
+  border-bottom: 1px solid var(--macos-border);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -629,3 +630,137 @@ body {
 /* ml-auto for pushing elements to the right in flex containers */
 .ml-auto { margin-left: auto; }
 .ml-sm { margin-left: var(--spacing-sm); }
+
+/* ── Sidebar layout update: nav strip + footer ── */
+.sidebar-nav {
+  /* no flex — these are just block list-items */
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+/* ── Settings Pane ── */
+.settings-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--macos-bg-secondary);
+}
+
+.settings-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--macos-border);
+  background-color: var(--macos-bg-primary);
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+}
+
+.settings-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--macos-text-primary);
+}
+
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  max-width: 640px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.settings-section-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--macos-text-primary);
+}
+
+.settings-section-description {
+  font-size: var(--font-size-sm);
+  color: var(--macos-text-secondary);
+  line-height: 1.6;
+}
+
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.settings-action-card {
+  background-color: var(--macos-bg-primary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.settings-action-info {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.settings-action-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--macos-text-primary);
+}
+
+.settings-action-description {
+  font-size: var(--font-size-sm);
+  color: var(--macos-text-secondary);
+  line-height: 1.5;
+}
+
+.settings-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.settings-status {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+.settings-status-success {
+  color: var(--macos-success);
+  background-color: rgba(52, 199, 89, 0.08);
+}
+
+.settings-status-error {
+  color: var(--macos-error);
+  background-color: rgba(255, 59, 48, 0.08);
+}
+
+.settings-about {
+  background-color: var(--macos-bg-primary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}

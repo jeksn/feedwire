@@ -3,11 +3,12 @@ import { Sidebar } from "./components/Sidebar";
 import { ArticleList } from "./components/ArticleList";
 import { ContentPane } from "./components/ContentPane";
 import { AddFeedDialog } from "./components/AddFeedDialog";
+import { SettingsPane } from "./components/SettingsPane";
 import { feedApi } from "./api/feed";
 import type { Feed, Article } from "./types";
 import "./styles/macos.css";
 
-type View = 'feed' | 'unread' | 'bookmarks';
+type View = 'feed' | 'unread' | 'bookmarks' | 'settings';
 
 function App() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -94,6 +95,24 @@ function App() {
     setSelectedArticle(null);
     setSelectedView('bookmarks');
     loadBookmarks();
+  };
+
+  const handleSettingsSelect = () => {
+    setSelectedFeed(null);
+    setSelectedArticle(null);
+    setSelectedView('settings');
+  };
+
+  const handleImportOpml = async (): Promise<string> => {
+    const result = await feedApi.importOpml();
+    // Refresh feeds list after import
+    await loadFeeds();
+    if (selectedView === 'feed') loadArticles(selectedFeed?.id);
+    return result;
+  };
+
+  const handleExportOpml = async (): Promise<string> => {
+    return await feedApi.exportOpml();
   };
 
   const handleArticleSelect = async (article: Article) => {
@@ -246,27 +265,38 @@ function App() {
         onFeedSelect={handleFeedSelect}
         onUnreadSelect={handleUnreadSelect}
         onBookmarksSelect={handleBookmarksSelect}
+        onSettingsSelect={handleSettingsSelect}
         onAddFeed={() => setShowAddFeedDialog(true)}
         onRefreshAll={handleRefreshAll}
         onDeleteFeed={handleDeleteFeed}
         loading={loading}
       />
 
-      <ArticleList
-        articles={articles}
-        selectedArticle={selectedArticle}
-        onArticleSelect={handleArticleSelect}
-        loading={loading}
-        selectedFeed={selectedFeed}
-        title={articleListTitle}
-        onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
-        onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
-      />
+      {selectedView === 'settings' ? (
+        <SettingsPane
+          feedCount={feeds.length}
+          onImport={handleImportOpml}
+          onExport={handleExportOpml}
+        />
+      ) : (
+        <>
+          <ArticleList
+            articles={articles}
+            selectedArticle={selectedArticle}
+            onArticleSelect={handleArticleSelect}
+            loading={loading}
+            selectedFeed={selectedFeed}
+            title={articleListTitle}
+            onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
+            onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
+          />
 
-      <ContentPane
-        article={selectedArticle}
-        onToggleBookmark={handleToggleBookmark}
-      />
+          <ContentPane
+            article={selectedArticle}
+            onToggleBookmark={handleToggleBookmark}
+          />
+        </>
+      )}
 
       {showAddFeedDialog && (
         <AddFeedDialog

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Feed, Article, NewFeed, FeedUpdate, ArticleUpdate } from '../types';
+import type { Feed, Article } from '../types';
 
 export const feedApi = {
   // Feed operations
@@ -58,5 +58,13 @@ export const feedApi = {
 
   markAllRead: async (feedId?: string): Promise<void> => {
     return await invoke('mark_all_read', { feedId });
+  },
+
+  exportOpml: async (): Promise<string> => {
+    return await invoke('export_opml');
+  },
+
+  importOpml: async (): Promise<string> => {
+    return await invoke('import_opml');
   },
 };
