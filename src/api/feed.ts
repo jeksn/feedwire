@@ -27,6 +27,10 @@ export const feedApi = {
     return await invoke('delete_feed', { feedId });
   },
 
+  deleteAllFeeds: async (): Promise<number> => {
+    return await invoke('delete_all_feeds');
+  },
+
   refreshFeed: async (feedId: string): Promise<Article[]> => {
     return await invoke('refresh_feed', { feedId });
   },

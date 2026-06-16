@@ -88,6 +88,12 @@ pub async fn delete_feed(feed_id: String, db: State<'_, DbState>) -> Result<(), 
 }
 
 #[tauri::command]
+pub async fn delete_all_feeds(db: State<'_, DbState>) -> Result<usize, String> {
+    let db = db.lock().await;
+    db.delete_all_feeds().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_articles(
     feed_id: Option<String>,
     limit: Option<i64>,

@@ -125,6 +125,16 @@ function App() {
     return await feedApi.exportOpml();
   };
 
+  const handleDeleteAllFeeds = async (): Promise<number> => {
+    const count = await feedApi.deleteAllFeeds();
+    setFeeds([]);
+    setArticles([]);
+    setSelectedFeed(null);
+    setSelectedArticle(null);
+    setUnreadCounts({});
+    return count;
+  };
+
   const handleArticleSelect = async (article: Article) => {
     setSelectedArticle(article);
 
@@ -286,6 +296,7 @@ function App() {
           feedCount={feeds.length}
           onImport={handleImportOpml}
           onExport={handleExportOpml}
+          onDeleteAll={handleDeleteAllFeeds}
           theme={theme}
           onThemeChange={setTheme}
         />

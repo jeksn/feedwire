@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import type { ThemePreference } from '../hooks/useTheme';
 import type { ImportResult } from '../api/feed';
 
@@ -7,6 +7,7 @@ interface SettingsPaneProps {
   feedCount: number;
   onImport: () => Promise<ImportResult>;
   onExport: () => Promise<string>;
+  onDeleteAll: () => Promise<number>;
   theme: ThemePreference;
   onThemeChange: (t: ThemePreference) => void;
 }
@@ -23,9 +24,12 @@ type ExportStatus =
   | { type: 'success'; message: string }
   | { type: 'error'; message: string };
 
-export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChange }: SettingsPaneProps) {
+type DeleteAllStatus = { type: 'idle' } | { type: 'confirm' } | { type: 'loading' } | { type: 'done'; count: number };
+
+export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme, onThemeChange }: SettingsPaneProps) {
   const [importStatus, setImportStatus] = useState<ImportStatus>({ type: 'idle' });
   const [exportStatus, setExportStatus] = useState<ExportStatus>({ type: 'idle' });
+  const [deleteAllStatus, setDeleteAllStatus] = useState<DeleteAllStatus>({ type: 'idle' });
 
   const handleImport = async () => {
     setImportStatus({ type: 'loading' });
@@ -39,6 +43,21 @@ export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChan
       } else {
         setImportStatus({ type: 'error', message: msg });
       }
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (deleteAllStatus.type !== 'confirm') {
+      setDeleteAllStatus({ type: 'confirm' });
+      return;
+    }
+    setDeleteAllStatus({ type: 'loading' });
+    try {
+      const count = await onDeleteAll();
+      setDeleteAllStatus({ type: 'done', count });
+    } catch (err) {
+      // Reset on error — unlikely but safe
+      setDeleteAllStatus({ type: 'idle' });
     }
   };
 
@@ -154,6 +173,57 @@ export function SettingsPane({ feedCount, onImport, onExport, theme, onThemeChan
                 Export
               </button>
               <ExportStatusBadge status={exportStatus} />
+            </div>
+          </div>
+        </section>
+
+        {/* Data section */}
+        <section className="settings-section">
+          <h3 className="settings-section-title">Data</h3>
+          <p className="settings-section-description">
+            Manage your stored feed data. These actions cannot be undone.
+          </p>
+          <div className="settings-actions">
+            <div className="settings-action-card settings-action-card--danger">
+              <div className="settings-action-info">
+                <div className="flex items-center gap-sm">
+                  <Trash2 size={18} className="text-destructive" />
+                  <span className="settings-action-title">Delete All Feeds</span>
+                </div>
+                <p className="settings-action-description">
+                  Permanently removes all {feedCount} {feedCount === 1 ? 'feed' : 'feeds'} and
+                  their articles. This cannot be undone.
+                </p>
+              </div>
+              {deleteAllStatus.type === 'done' ? (
+                <div className="settings-status settings-status-success">
+                  <CheckCircle size={13} />
+                  <span>Removed {deleteAllStatus.count} {deleteAllStatus.count === 1 ? 'feed' : 'feeds'}</span>
+                </div>
+              ) : (
+                <div className="delete-all-actions">
+                  {deleteAllStatus.type === 'confirm' && (
+                    <button
+                      className="btn btn-ghost settings-action-btn"
+                      onClick={() => setDeleteAllStatus({ type: 'idle' })}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    className={`btn settings-action-btn ${deleteAllStatus.type === 'confirm' ? 'btn-destructive' : 'btn-destructive-outline'}`}
+                    onClick={handleDeleteAll}
+                    disabled={deleteAllStatus.type === 'loading' || feedCount === 0}
+                  >
+                    {deleteAllStatus.type === 'loading' ? (
+                      <Loader size={14} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                    {deleteAllStatus.type === 'confirm' ? 'Yes, delete everything' : 'Delete All Feeds'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>

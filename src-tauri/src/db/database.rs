@@ -193,6 +193,14 @@ impl Database {
         Ok(())
     }
 
+    pub async fn delete_all_feeds(&self) -> Result<usize, DatabaseError> {
+        let result = sqlx::query("UPDATE feeds SET is_active = 0 WHERE is_active = 1")
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected() as usize)
+    }
+
     // Article operations
     pub async fn create_article(&self, article: NewArticle) -> Result<Article, DatabaseError> {
         let id = uuid::Uuid::new_v4().to_string();

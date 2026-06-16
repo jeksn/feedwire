@@ -782,6 +782,48 @@ body {
   gap: var(--spacing-sm);
 }
 
+.settings-action-card--danger {
+  border-color: rgba(255, 59, 48, 0.25);
+  background-color: rgba(255, 59, 48, 0.03);
+}
+
+.delete-all-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+/* Destructive button — solid red */
+.btn-destructive {
+  background-color: var(--macos-error);
+  color: #fff;
+  border: 1px solid var(--macos-error);
+}
+.btn-destructive:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--macos-error) 85%, black);
+  border-color: color-mix(in srgb, var(--macos-error) 85%, black);
+}
+
+/* Destructive button — outline only (idle state) */
+.btn-destructive-outline {
+  background-color: transparent;
+  color: var(--macos-error);
+  border: 1px solid rgba(255, 59, 48, 0.4);
+}
+.btn-destructive-outline:hover:not(:disabled) {
+  background-color: rgba(255, 59, 48, 0.06);
+  border-color: var(--macos-error);
+}
+.btn-destructive-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.text-destructive {
+  color: var(--macos-error);
+}
+
 .settings-action-info {
   flex: 1;
   min-width: 200px;

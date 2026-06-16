@@ -73,6 +73,7 @@ pub fn run() {
             db::commands::add_feed,
             db::commands::get_feeds,
             db::commands::delete_feed,
+            db::commands::delete_all_feeds,
             db::commands::get_articles,
             db::commands::get_article,
             db::commands::mark_article_read,
