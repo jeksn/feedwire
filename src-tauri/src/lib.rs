@@ -86,6 +86,11 @@ pub fn run() {
             db::commands::get_unread_count,
             db::commands::export_opml,
             db::commands::import_opml,
+            db::commands::get_filter_settings,
+            db::commands::set_skip_youtube_shorts,
+            db::commands::add_filter_rule,
+            db::commands::update_filter_rule_enabled,
+            db::commands::delete_filter_rule,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

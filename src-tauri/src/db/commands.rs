@@ -1,9 +1,13 @@
 use crate::db::{Database, FeedParser, FeedUpdate, ArticleUpdate};
+use crate::db::filters::should_keep;
+use crate::db::models::NewFilterRule;
 use crate::opml;
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+const SETTING_SKIP_YOUTUBE_SHORTS: &str = "skip_youtube_shorts";
 
 pub type DbState = Arc<Mutex<Database>>;
 
@@ -157,20 +161,34 @@ pub async fn mark_all_read(feed_id: Option<String>, db: State<'_, DbState>) -> R
 
 #[tauri::command]
 pub async fn refresh_feed(feed_id: String, db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
-    // Fetch feed URL — brief lock, released before any network I/O
-    let feed_url = {
+    // Fetch feed URL + filter settings — brief lock, released before any network I/O
+    let (feed_url, skip_shorts, rules) = {
         let db_guard = db.lock().await;
-        db_guard.get_feed_by_id(&feed_id).await.map_err(|e| e.to_string())?.url
+        let url = db_guard.get_feed_by_id(&feed_id).await.map_err(|e| e.to_string())?.url;
+        let skip_shorts = db_guard
+            .get_setting(SETTING_SKIP_YOUTUBE_SHORTS)
+            .await
+            .map_err(|e| e.to_string())?
+            .map(|v| v == "true")
+            .unwrap_or(false);
+        let rules = db_guard.get_filter_rules().await.map_err(|e| e.to_string())?;
+        (url, skip_shorts, rules)
     };
 
     // Network call — no lock held
     let parser = FeedParser::new();
     let (_, articles) = parser.fetch_feed(&feed_url).await.map_err(|e| e.to_string())?;
 
+    // Apply filters
+    let filtered: Vec<_> = articles
+        .into_iter()
+        .filter(|a| should_keep(a, skip_shorts, &rules))
+        .collect();
+
     // Persist — lock held only for DB writes
     let db_guard = db.lock().await;
     let mut saved_articles = Vec::new();
-    for mut article in articles {
+    for mut article in filtered {
         article.feed_id = feed_id.clone();
         let saved = db_guard.create_article(article).await.map_err(|e| e.to_string())?;
         saved_articles.push(saved);
@@ -214,10 +232,17 @@ pub async fn get_unread_count(feed_id: Option<String>, db: State<'_, DbState>) -
 }
 
 async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Read feed URL — brief lock
-    let feed_url = {
+    // Read feed URL + filter settings — brief lock
+    let (feed_url, skip_shorts, rules) = {
         let db_guard = db.lock().await;
-        db_guard.get_feed_by_id(&feed_id).await?.url
+        let url = db_guard.get_feed_by_id(&feed_id).await?.url;
+        let skip_shorts = db_guard
+            .get_setting(SETTING_SKIP_YOUTUBE_SHORTS)
+            .await?
+            .map(|v| v == "true")
+            .unwrap_or(false);
+        let rules = db_guard.get_filter_rules().await?;
+        (url, skip_shorts, rules)
     };
 
     // Network call — no lock held
@@ -225,9 +250,16 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
     let parser = FeedParser::new();
     let (_, articles) = parser.fetch_feed(&feed_url).await?;
 
+    // Apply filters before persisting
+    let filtered: Vec<_> = articles
+        .into_iter()
+        .filter(|a| should_keep(a, skip_shorts, &rules))
+        .take(MAX_INITIAL_ARTICLES)
+        .collect();
+
     // Write articles — lock held only for DB operations
     let db_guard = db.lock().await;
-    for mut article in articles.into_iter().take(MAX_INITIAL_ARTICLES) {
+    for mut article in filtered {
         article.feed_id = feed_id.clone();
         db_guard.create_article(article).await?;
     }
@@ -242,6 +274,64 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
 
 async fn refresh_feed_helper(feed_id: String, db: Arc<Mutex<Database>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     fetch_feed_articles(feed_id, db).await
+}
+
+// ── Filter rule commands ──────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn get_filter_settings(db: State<'_, DbState>) -> Result<crate::db::models::FilterSettings, String> {
+    let db_guard = db.lock().await;
+    let skip_youtube_shorts = db_guard
+        .get_setting(SETTING_SKIP_YOUTUBE_SHORTS)
+        .await
+        .map_err(|e| e.to_string())?
+        .map(|v| v == "true")
+        .unwrap_or(false);
+    let rules = db_guard.get_filter_rules().await.map_err(|e| e.to_string())?;
+    Ok(crate::db::models::FilterSettings { skip_youtube_shorts, rules })
+}
+
+#[tauri::command]
+pub async fn set_skip_youtube_shorts(enabled: bool, db: State<'_, DbState>) -> Result<(), String> {
+    let db_guard = db.lock().await;
+    db_guard
+        .set_setting(SETTING_SKIP_YOUTUBE_SHORTS, if enabled { "true" } else { "false" })
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_filter_rule(pattern: String, field: String, db: State<'_, DbState>) -> Result<crate::db::models::FilterRule, String> {
+    // Validate field
+    if field != "url" && field != "title" {
+        return Err(format!("Invalid field '{}': must be 'url' or 'title'", field));
+    }
+    if pattern.trim().is_empty() {
+        return Err("Pattern cannot be empty".to_string());
+    }
+    let db_guard = db.lock().await;
+    db_guard
+        .add_filter_rule(NewFilterRule { pattern, field })
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_filter_rule_enabled(rule_id: String, enabled: bool, db: State<'_, DbState>) -> Result<(), String> {
+    let db_guard = db.lock().await;
+    db_guard
+        .update_filter_rule_enabled(&rule_id, enabled)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_filter_rule(rule_id: String, db: State<'_, DbState>) -> Result<(), String> {
+    let db_guard = db.lock().await;
+    db_guard
+        .delete_filter_rule(&rule_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Export all feeds as an OPML 2.0 file — opens a native save dialog.

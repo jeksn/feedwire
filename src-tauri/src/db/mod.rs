@@ -1,5 +1,6 @@
 pub mod database;
 pub mod feed;
+pub mod filters;
 pub mod models;
 pub mod commands;
 

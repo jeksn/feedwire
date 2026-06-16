@@ -50,3 +50,18 @@ export interface ArticleUpdate {
   is_read?: boolean;
   is_bookmarked?: boolean;
 }
+
+export type FilterField = 'url' | 'title';
+
+export interface FilterRule {
+  id: string;
+  pattern: string;
+  field: FilterField;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface FilterSettings {
+  skip_youtube_shorts: boolean;
+  rules: FilterRule[];
+}

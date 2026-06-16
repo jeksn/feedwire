@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Feed, Article } from '../types';
+import type { Feed, Article, FilterRule, FilterSettings, FilterField } from '../types';
 
 export interface FailedFeed {
   url: string;
@@ -82,5 +82,26 @@ export const feedApi = {
 
   importOpml: async (): Promise<ImportResult> => {
     return await invoke('import_opml');
+  },
+
+  // Filter settings
+  getFilterSettings: async (): Promise<FilterSettings> => {
+    return await invoke('get_filter_settings');
+  },
+
+  setSkipYoutubeShorts: async (enabled: boolean): Promise<void> => {
+    return await invoke('set_skip_youtube_shorts', { enabled });
+  },
+
+  addFilterRule: async (pattern: string, field: FilterField): Promise<FilterRule> => {
+    return await invoke('add_filter_rule', { pattern, field });
+  },
+
+  updateFilterRuleEnabled: async (ruleId: string, enabled: boolean): Promise<void> => {
+    return await invoke('update_filter_rule_enabled', { ruleId, enabled });
+  },
+
+  deleteFilterRule: async (ruleId: string): Promise<void> => {
+    return await invoke('delete_filter_rule', { ruleId });
   },
 };

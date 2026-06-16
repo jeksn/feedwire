@@ -101,6 +101,33 @@ impl Database {
             .execute(&self.pool)
             .await?;
 
+        // Filter rules table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS filter_rules (
+                id TEXT PRIMARY KEY,
+                pattern TEXT NOT NULL,
+                field TEXT NOT NULL DEFAULT 'url',
+                enabled BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // App settings key/value store
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 
@@ -411,5 +438,82 @@ impl Database {
         
         let count: Option<i64> = query_builder.fetch_one(&self.pool).await?;
         Ok(count.unwrap_or(0))
+    }
+
+    // ── Filter rules ─────────────────────────────────────────────────────────
+
+    pub async fn get_filter_rules(&self) -> Result<Vec<FilterRule>, DatabaseError> {
+        let rules = sqlx::query_as::<_, FilterRule>(
+            "SELECT * FROM filter_rules ORDER BY created_at ASC"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rules)
+    }
+
+    pub async fn add_filter_rule(&self, rule: NewFilterRule) -> Result<FilterRule, DatabaseError> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now();
+
+        let rule = FilterRule {
+            id: id.clone(),
+            pattern: rule.pattern,
+            field: rule.field,
+            enabled: true,
+            created_at: now,
+        };
+
+        sqlx::query(
+            "INSERT INTO filter_rules (id, pattern, field, enabled, created_at) VALUES (?, ?, ?, ?, ?)"
+        )
+        .bind(&rule.id)
+        .bind(&rule.pattern)
+        .bind(&rule.field)
+        .bind(rule.enabled)
+        .bind(&rule.created_at)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(rule)
+    }
+
+    pub async fn update_filter_rule_enabled(&self, id: &str, enabled: bool) -> Result<(), DatabaseError> {
+        sqlx::query("UPDATE filter_rules SET enabled = ? WHERE id = ?")
+            .bind(enabled)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete_filter_rule(&self, id: &str) -> Result<(), DatabaseError> {
+        sqlx::query("DELETE FROM filter_rules WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    // ── App settings ─────────────────────────────────────────────────────────
+
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
+        let row = sqlx::query_as::<_, AppSetting>(
+            "SELECT key, value FROM app_settings WHERE key = ?"
+        )
+        .bind(key)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| r.value))
+    }
+
+    pub async fn set_setting(&self, key: &str, value: &str) -> Result<(), DatabaseError> {
+        sqlx::query(
+            "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        )
+        .bind(key)
+        .bind(value)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }

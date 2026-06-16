@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp, Trash2, Plus, X } from 'lucide-react';
 import type { ThemePreference } from '../hooks/useTheme';
 import type { ImportResult } from '../api/feed';
+import { feedApi } from '../api/feed';
+import type { FilterRule, FilterField, FilterSettings } from '../types';
 
 interface SettingsPaneProps {
   feedCount: number;
@@ -228,6 +230,9 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
           </div>
         </section>
 
+        {/* Filter rules section */}
+        <FilterRulesSection />
+
         {/* About section */}
         <section className="settings-section">
           <h3 className="settings-section-title">About</h3>
@@ -320,5 +325,157 @@ function ExportStatusBadge({ status }: { status: ExportStatus }) {
       <AlertCircle size={13} />
       <span>{status.message}</span>
     </div>
+  );
+}
+
+// ── Filter Rules Section ──────────────────────────────────────────────────────
+
+function FilterRulesSection() {
+  const [settings, setSettings] = useState<FilterSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [newPattern, setNewPattern] = useState('');
+  const [newField, setNewField] = useState<FilterField>('url');
+  const [addError, setAddError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const s = await feedApi.getFilterSettings();
+      setSettings(s);
+    } catch (e) {
+      console.error('Failed to load filter settings', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleShortsToggle = async () => {
+    if (!settings) return;
+    const next = !settings.skip_youtube_shorts;
+    setSettings(s => s ? { ...s, skip_youtube_shorts: next } : s);
+    try {
+      await feedApi.setSkipYoutubeShorts(next);
+    } catch (e) {
+      // Revert on failure
+      setSettings(s => s ? { ...s, skip_youtube_shorts: !next } : s);
+    }
+  };
+
+  const handleAddRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const pattern = newPattern.trim();
+    if (!pattern) { setAddError('Pattern cannot be empty'); return; }
+    setAddError('');
+    try {
+      const rule = await feedApi.addFilterRule(pattern, newField);
+      setSettings(s => s ? { ...s, rules: [...s.rules, rule] } : s);
+      setNewPattern('');
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const handleToggleRule = async (rule: FilterRule) => {
+    const next = !rule.enabled;
+    setSettings(s => s ? { ...s, rules: s.rules.map(r => r.id === rule.id ? { ...r, enabled: next } : r) } : s);
+    try {
+      await feedApi.updateFilterRuleEnabled(rule.id, next);
+    } catch {
+      // Revert
+      setSettings(s => s ? { ...s, rules: s.rules.map(r => r.id === rule.id ? { ...r, enabled: !next } : r) } : s);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    setSettings(s => s ? { ...s, rules: s.rules.filter(r => r.id !== ruleId) } : s);
+    try {
+      await feedApi.deleteFilterRule(ruleId);
+    } catch {
+      // Reload to restore state
+      load();
+    }
+  };
+
+  return (
+    <section className="settings-section">
+      <h3 className="settings-section-title">Article Filters</h3>
+      <p className="settings-section-description">
+        Articles matching any enabled filter are hidden when feeds are fetched or
+        refreshed. Existing articles are not affected retroactively.
+      </p>
+
+      {loading ? (
+        <div className="filter-loading"><Loader size={14} className="animate-spin" /> Loading…</div>
+      ) : settings && (
+        <>
+          {/* YouTube Shorts toggle */}
+          <div className="filter-toggle-row" onClick={handleShortsToggle} role="button" tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && handleShortsToggle()}>
+            <div className="filter-toggle-info">
+              <span className="filter-toggle-label">Skip YouTube Shorts</span>
+              <span className="filter-toggle-description">
+                Hide articles whose URL contains <code>youtube.com/shorts/</code>
+              </span>
+            </div>
+            <div className={`filter-toggle${settings.skip_youtube_shorts ? ' filter-toggle--on' : ''}`}>
+              <div className="filter-toggle-thumb" />
+            </div>
+          </div>
+
+          {/* User-defined rules */}
+          <div className="filter-rules-list">
+            {settings.rules.length === 0 ? (
+              <p className="filter-rules-empty">No custom rules yet.</p>
+            ) : (
+              settings.rules.map(rule => (
+                <div key={rule.id} className={`filter-rule-row${rule.enabled ? '' : ' filter-rule-row--disabled'}`}>
+                  <button
+                    className={`filter-rule-check${rule.enabled ? ' filter-rule-check--on' : ''}`}
+                    onClick={() => handleToggleRule(rule)}
+                    title={rule.enabled ? 'Disable rule' : 'Enable rule'}
+                  />
+                  <span className="filter-rule-field">{rule.field}</span>
+                  <span className="filter-rule-pattern">{rule.pattern}</span>
+                  <button
+                    className="filter-rule-delete"
+                    onClick={() => handleDeleteRule(rule.id)}
+                    title="Delete rule"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Add rule form */}
+          <form className="filter-add-form" onSubmit={handleAddRule}>
+            <select
+              className="filter-add-field"
+              value={newField}
+              onChange={e => setNewField(e.target.value as FilterField)}
+            >
+              <option value="url">URL</option>
+              <option value="title">Title</option>
+            </select>
+            <input
+              className="filter-add-input"
+              placeholder="Substring to match…"
+              value={newPattern}
+              onChange={e => { setNewPattern(e.target.value); setAddError(''); }}
+            />
+            <button className="btn btn-secondary filter-add-btn" type="submit">
+              <Plus size={13} /> Add
+            </button>
+          </form>
+          {addError && (
+            <div className="settings-status settings-status-error" style={{ marginTop: 6 }}>
+              <AlertCircle size={13} /><span>{addError}</span>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }
