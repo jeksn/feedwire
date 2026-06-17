@@ -8,6 +8,8 @@ export interface Feed {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  /** Foreign key into folders; null means ungrouped. */
+  folder_id?: string | null;
   /** ISO timestamp of the most recently published article for this feed. */
   latest_article_at?: string;
 }
@@ -51,6 +53,15 @@ export interface ArticleUpdate {
   published_at?: string;
   is_read?: boolean;
   is_bookmarked?: boolean;
+}
+
+// ── Folders ──────────────────────────────────────────────────────────────────
+
+export interface Folder {
+  id: string;
+  name: string;
+  position: number;
+  created_at: string;
 }
 
 export type FilterField = 'url' | 'title';

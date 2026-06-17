@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Feed, Article, FilterRule, FilterSettings, FilterField } from '../types';
+import type { Feed, Article, Folder, FilterRule, FilterSettings, FilterField } from '../types';
 
 export interface FailedFeed {
   url: string;
@@ -82,6 +82,27 @@ export const feedApi = {
 
   importOpml: async (): Promise<ImportResult> => {
     return await invoke('import_opml');
+  },
+
+  // Folder operations
+  getFolders: async (): Promise<Folder[]> => {
+    return await invoke('get_folders');
+  },
+
+  createFolder: async (name: string): Promise<Folder> => {
+    return await invoke('create_folder', { name });
+  },
+
+  renameFolder: async (folderId: string, name: string): Promise<Folder> => {
+    return await invoke('rename_folder', { folderId, name });
+  },
+
+  deleteFolder: async (folderId: string): Promise<void> => {
+    return await invoke('delete_folder', { folderId });
+  },
+
+  setFeedFolder: async (feedId: string, folderId: string | null): Promise<Feed> => {
+    return await invoke('set_feed_folder', { feedId, folderId });
   },
 
   // Filter settings

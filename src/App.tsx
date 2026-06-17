@@ -288,6 +288,7 @@ function App() {
         onSettingsSelect={handleSettingsSelect}
         onAddFeed={() => setShowAddFeedDialog(true)}
         onRefreshAll={handleRefreshAll}
+        onFeedsChanged={loadFeeds}
         loading={loading}
       />
 

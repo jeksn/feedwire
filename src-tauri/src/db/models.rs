@@ -74,9 +74,27 @@ pub struct Feed {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub is_active: bool,
+    /// Foreign key into the folders table; NULL means ungrouped.
+    pub folder_id: Option<String>,
     /// Most recent article published_at across all articles for this feed.
     /// NULL when the feed has no articles yet.
     pub latest_article_at: Option<DateTime<Utc>>,
+}
+
+// ── Folders ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Folder {
+    pub id: String,
+    pub name: String,
+    pub position: i64,
+    pub created_at: DateTime<Utc>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewFolder {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

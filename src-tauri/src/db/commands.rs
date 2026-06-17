@@ -1,6 +1,6 @@
 use crate::db::{Database, FeedParser, FeedUpdate, ArticleUpdate};
 use crate::db::filters::should_keep;
-use crate::db::models::NewFilterRule;
+use crate::db::models::{NewFilterRule, Folder};
 use crate::opml;
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
@@ -274,6 +274,53 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
 
 async fn refresh_feed_helper(feed_id: String, db: Arc<Mutex<Database>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     fetch_feed_articles(feed_id, db).await
+}
+
+// ── Folder commands ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn get_folders(db: State<'_, DbState>) -> Result<Vec<Folder>, String> {
+    let db_guard = db.lock().await;
+    db_guard.get_folders().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_folder(name: String, db: State<'_, DbState>) -> Result<Folder, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("Folder name cannot be empty".to_string());
+    }
+    let db_guard = db.lock().await;
+    db_guard.create_folder(&name).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn rename_folder(folder_id: String, name: String, db: State<'_, DbState>) -> Result<Folder, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("Folder name cannot be empty".to_string());
+    }
+    let db_guard = db.lock().await;
+    db_guard.rename_folder(&folder_id, &name).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_folder(folder_id: String, db: State<'_, DbState>) -> Result<(), String> {
+    let db_guard = db.lock().await;
+    db_guard.delete_folder(&folder_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_feed_folder(
+    feed_id: String,
+    folder_id: Option<String>,
+    db: State<'_, DbState>,
+) -> Result<crate::db::models::Feed, String> {
+    let db_guard = db.lock().await;
+    db_guard
+        .set_feed_folder(&feed_id, folder_id.as_deref())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // ── Filter rule commands ──────────────────────────────────────────────────────

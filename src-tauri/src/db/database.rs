@@ -10,6 +10,8 @@ pub enum DatabaseError {
     FeedNotFound,
     #[error("Article not found")]
     ArticleNotFound,
+    #[error("Folder not found")]
+    FolderNotFound,
     #[error("Feed already exists")]
     DuplicateUrl,
 }
@@ -128,6 +130,28 @@ impl Database {
         .execute(&self.pool)
         .await?;
 
+        // Folders table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS folders (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Add folder_id to feeds if it doesn't exist yet (safe on existing DBs)
+        let _ = sqlx::query(
+            "ALTER TABLE feeds ADD COLUMN folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL"
+        )
+        .execute(&self.pool)
+        .await;
+        // Ignore error — column already exists on new DBs created after this migration
+
         Ok(())
     }
 
@@ -146,6 +170,7 @@ impl Database {
             created_at: now,
             updated_at: now,
             is_active: true,
+            folder_id: None,
             latest_article_at: None,
         };
 
@@ -176,6 +201,7 @@ impl Database {
             SELECT
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
+                f.folder_id,
                 MAX(a.published_at) AS latest_article_at
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
@@ -196,6 +222,7 @@ impl Database {
             SELECT
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
+                f.folder_id,
                 MAX(a.published_at) AS latest_article_at
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
@@ -240,6 +267,7 @@ impl Database {
             SELECT
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
+                f.folder_id,
                 MAX(a.published_at) AS latest_article_at
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
@@ -545,5 +573,91 @@ impl Database {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    // ── Folders ───────────────────────────────────────────────────────────────
+
+    pub async fn get_folders(&self) -> Result<Vec<Folder>, DatabaseError> {
+        let folders = sqlx::query_as::<_, Folder>(
+            "SELECT * FROM folders ORDER BY position ASC, name ASC"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(folders)
+    }
+
+    pub async fn create_folder(&self, name: &str) -> Result<Folder, DatabaseError> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now();
+
+        // Position = max existing + 1
+        let max_pos: Option<i64> = sqlx::query_scalar("SELECT MAX(position) FROM folders")
+            .fetch_one(&self.pool)
+            .await?;
+        let position = max_pos.unwrap_or(-1) + 1;
+
+        let folder = Folder { id: id.clone(), name: name.to_string(), position, created_at: now };
+
+        sqlx::query(
+            "INSERT INTO folders (id, name, position, created_at) VALUES (?, ?, ?, ?)"
+        )
+        .bind(&folder.id)
+        .bind(&folder.name)
+        .bind(folder.position)
+        .bind(&folder.created_at)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(folder)
+    }
+
+    pub async fn rename_folder(&self, id: &str, name: &str) -> Result<Folder, DatabaseError> {
+        let rows = sqlx::query("UPDATE folders SET name = ? WHERE id = ?")
+            .bind(name)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        if rows.rows_affected() == 0 {
+            return Err(DatabaseError::FolderNotFound);
+        }
+
+        self.get_folder_by_id(id).await
+    }
+
+    pub async fn delete_folder(&self, id: &str) -> Result<(), DatabaseError> {
+        // Unassign feeds that were in this folder
+        sqlx::query("UPDATE feeds SET folder_id = NULL WHERE folder_id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        sqlx::query("DELETE FROM folders WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn set_feed_folder(&self, feed_id: &str, folder_id: Option<&str>) -> Result<Feed, DatabaseError> {
+        sqlx::query("UPDATE feeds SET folder_id = ? WHERE id = ?")
+            .bind(folder_id)
+            .bind(feed_id)
+            .execute(&self.pool)
+            .await?;
+
+        self.get_feed_by_id(feed_id).await
+    }
+
+    async fn get_folder_by_id(&self, id: &str) -> Result<Folder, DatabaseError> {
+        let folder = sqlx::query_as::<_, Folder>(
+            "SELECT * FROM folders WHERE id = ?"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        folder.ok_or(DatabaseError::FolderNotFound)
     }
 }

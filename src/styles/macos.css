@@ -677,6 +677,172 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Sidebar folder groups ── */
+.sidebar-folder-group {
+  /* no extra padding — children use list-item */
+}
+
+.sidebar-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px var(--spacing-md);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--macos-text-secondary);
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.15s;
+}
+
+.sidebar-folder-header:hover {
+  color: var(--macos-text-primary);
+}
+
+.sidebar-folder-chevron {
+  flex-shrink: 0;
+  color: var(--macos-text-tertiary);
+  transition: transform 0.18s;
+}
+
+.sidebar-folder-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.sidebar-folder-icon {
+  flex-shrink: 0;
+  color: var(--macos-text-tertiary);
+}
+
+.sidebar-folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Indented feed rows inside folders */
+.list-item--indented {
+  padding-left: calc(var(--spacing-md) + 22px);
+}
+
+/* ── Context menu ── */
+.context-menu {
+  z-index: 1000;
+  min-width: 180px;
+  background: var(--macos-bg-primary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .context-menu {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.context-menu-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--macos-text-tertiary);
+  padding: 4px 10px 2px;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--macos-border-light);
+  margin: 3px 4px;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-system);
+  color: var(--macos-text-primary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.context-menu-item:hover {
+  background: var(--macos-bg-secondary);
+}
+
+.context-menu-item--active {
+  color: var(--macos-accent);
+  font-weight: 500;
+}
+
+.context-menu-item--remove {
+  color: var(--macos-error);
+}
+
+.context-menu-item--remove:hover {
+  background: rgba(255, 59, 48, 0.08);
+}
+
+.context-menu-item--confirm {
+  color: var(--macos-accent);
+  font-weight: 500;
+}
+
+.context-menu-item--cancel {
+  color: var(--macos-text-secondary);
+}
+
+.context-menu-check {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.context-menu-new-folder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 2px 2px;
+}
+
+.context-menu-folder-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-md);
+  background: var(--macos-bg-secondary);
+  color: var(--macos-text-primary);
+  font-size: var(--font-size-sm);
+  outline: none;
+  margin-bottom: 2px;
+  box-sizing: border-box;
+}
+
+.context-menu-folder-input:focus {
+  border-color: var(--macos-accent);
+}
+
+.context-menu-delete-hint {
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-tertiary);
+  padding: 2px 10px 6px;
+  line-height: 1.4;
+}
+
 /* ── Sidebar sort control ── */
 .sidebar-sort {
   display: flex;
