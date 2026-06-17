@@ -3,8 +3,15 @@ import {
   Plus, RefreshCw, Rss, Bookmark, Inbox, Settings,
   ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X,
 } from 'lucide-react';
+import { listen } from '@tauri-apps/api/event';
 import type { Feed, Folder } from '../types';
 import { feedApi } from '../api/feed';
+
+interface RefreshProgress {
+  done: number;
+  total: number;
+  feed_title: string;
+}
 
 export type SortOrder = 'alpha-asc' | 'alpha-desc' | 'updated-desc' | 'updated-asc';
 
@@ -119,6 +126,8 @@ export function Sidebar({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [folderContextMenu, setFolderContextMenu] = useState<FolderContextMenuState | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [progress, setProgress] = useState<RefreshProgress | null>(null);
+  const doneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +137,20 @@ export function Sidebar({
   useEffect(() => {
     feedApi.getFolders().then(setFolders).catch(console.error);
   }, [feeds]); // re-fetch when feeds change so folder state stays fresh
+
+  // Listen for per-feed refresh progress events from the backend
+  useEffect(() => {
+    const unlisten = listen<RefreshProgress>('refresh-progress', e => {
+      const p = e.payload;
+      setProgress(p);
+      // When the last feed is done, hold for 1.5s then clear
+      if (p.done === p.total) {
+        if (doneTimerRef.current) clearTimeout(doneTimerRef.current);
+        doneTimerRef.current = setTimeout(() => setProgress(null), 1500);
+      }
+    });
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
 
   // Close feed context menu on outside click or scroll
   useEffect(() => {
@@ -378,6 +401,15 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-footer">
+        {progress && (
+          <div className={`sidebar-status${progress.done === progress.total ? ' sidebar-status--done' : ''}`}>
+            {progress.done < progress.total && <RefreshCw size={11} className="animate-spin" />}
+            {progress.done < progress.total
+              ? `${progress.done} / ${progress.total} feeds`
+              : `Done — ${progress.total} feeds refreshed`
+            }
+          </div>
+        )}
         <div className="sidebar-section-divider" />
         <div
           className={`list-item ${selectedView === 'settings' ? 'active' : ''}`}

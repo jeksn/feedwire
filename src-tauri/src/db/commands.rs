@@ -2,10 +2,17 @@ use crate::db::{Database, FeedParser, FeedUpdate, ArticleUpdate};
 use crate::db::filters::should_keep;
 use crate::db::models::{NewFilterRule, Folder};
 use crate::opml;
-use tauri::State;
+use tauri::{State, AppHandle, Emitter};
 use tauri_plugin_dialog::DialogExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RefreshProgress {
+    pub done: usize,
+    pub total: usize,
+    pub feed_title: String,
+}
 
 const SETTING_SKIP_YOUTUBE_SHORTS: &str = "skip_youtube_shorts";
 
@@ -204,7 +211,7 @@ pub async fn refresh_feed(feed_id: String, db: State<'_, DbState>) -> Result<Vec
 }
 
 #[tauri::command]
-pub async fn refresh_all_feeds(db: State<'_, DbState>) -> Result<Vec<String>, String> {
+pub async fn refresh_all_feeds(app: AppHandle, db: State<'_, DbState>) -> Result<Vec<String>, String> {
     // Collect feed list first, then drop the lock before refreshing each feed
     let feeds = {
         let db_guard = db.lock().await;
@@ -212,13 +219,22 @@ pub async fn refresh_all_feeds(db: State<'_, DbState>) -> Result<Vec<String>, St
         // db_guard dropped here
     };
 
+    let total = feeds.len();
+    let mut done = 0;
     let mut refreshed_feeds = Vec::new();
+
     for feed in feeds {
         if let Err(e) = refresh_feed_helper(feed.id.clone(), db.inner().clone()).await {
             eprintln!("Failed to refresh feed {}: {}", feed.id, e);
         } else {
-            refreshed_feeds.push(feed.id);
+            refreshed_feeds.push(feed.id.clone());
         }
+        done += 1;
+        let _ = app.emit("refresh-progress", RefreshProgress {
+            done,
+            total,
+            feed_title: feed.title.clone(),
+        });
     }
 
     Ok(refreshed_feeds)

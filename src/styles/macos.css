@@ -677,6 +677,27 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Sidebar status bar ── */
+.sidebar-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--spacing-md);
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-secondary);
+  animation: sidebar-status-in 0.15s ease;
+}
+
+.sidebar-status--done {
+  color: var(--macos-text-tertiary);
+  animation: sidebar-status-in 0.15s ease;
+}
+
+@keyframes sidebar-status-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Sidebar folder groups ── */
 .sidebar-folder-group {
   /* no extra padding — children use list-item */
