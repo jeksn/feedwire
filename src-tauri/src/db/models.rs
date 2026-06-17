@@ -74,6 +74,9 @@ pub struct Feed {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub is_active: bool,
+    /// Most recent article published_at across all articles for this feed.
+    /// NULL when the feed has no articles yet.
+    pub latest_article_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

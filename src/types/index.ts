@@ -8,6 +8,8 @@ export interface Feed {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  /** ISO timestamp of the most recently published article for this feed. */
+  latest_article_at?: string;
 }
 
 export interface Article {

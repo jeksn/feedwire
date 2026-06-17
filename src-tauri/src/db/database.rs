@@ -146,6 +146,7 @@ impl Database {
             created_at: now,
             updated_at: now,
             is_active: true,
+            latest_article_at: None,
         };
 
         sqlx::query(
@@ -171,7 +172,17 @@ impl Database {
 
     pub async fn get_feeds(&self) -> Result<Vec<Feed>, DatabaseError> {
         let feeds = sqlx::query_as::<_, Feed>(
-            "SELECT * FROM feeds WHERE is_active = 1 ORDER BY title"
+            r#"
+            SELECT
+                f.id, f.title, f.url, f.description, f.feed_type,
+                f.last_fetched, f.created_at, f.updated_at, f.is_active,
+                MAX(a.published_at) AS latest_article_at
+            FROM feeds f
+            LEFT JOIN articles a ON a.feed_id = f.id
+            WHERE f.is_active = 1
+            GROUP BY f.id
+            ORDER BY f.title
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -181,7 +192,16 @@ impl Database {
 
     pub async fn get_feed_by_id(&self, id: &str) -> Result<Feed, DatabaseError> {
         let feed = sqlx::query_as::<_, Feed>(
-            "SELECT * FROM feeds WHERE id = ? AND is_active = 1"
+            r#"
+            SELECT
+                f.id, f.title, f.url, f.description, f.feed_type,
+                f.last_fetched, f.created_at, f.updated_at, f.is_active,
+                MAX(a.published_at) AS latest_article_at
+            FROM feeds f
+            LEFT JOIN articles a ON a.feed_id = f.id
+            WHERE f.id = ? AND f.is_active = 1
+            GROUP BY f.id
+            "#,
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -216,7 +236,17 @@ impl Database {
     /// Look up a feed by URL regardless of its active/inactive state.
     pub async fn get_feed_by_url(&self, url: &str) -> Result<Option<Feed>, DatabaseError> {
         let feed = sqlx::query_as::<_, Feed>(
-            "SELECT * FROM feeds WHERE url = ? LIMIT 1"
+            r#"
+            SELECT
+                f.id, f.title, f.url, f.description, f.feed_type,
+                f.last_fetched, f.created_at, f.updated_at, f.is_active,
+                MAX(a.published_at) AS latest_article_at
+            FROM feeds f
+            LEFT JOIN articles a ON a.feed_id = f.id
+            WHERE f.url = ?
+            GROUP BY f.id
+            LIMIT 1
+            "#,
         )
         .bind(url)
         .fetch_optional(&self.pool)

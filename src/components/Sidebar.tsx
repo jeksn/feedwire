@@ -1,5 +1,49 @@
-import { Plus, RefreshCw, Rss, Bookmark, Inbox, Settings } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, RefreshCw, Rss, Bookmark, Inbox, Settings, ArrowUpDown } from 'lucide-react';
 import type { Feed } from '../types';
+
+export type SortOrder = 'alpha-asc' | 'alpha-desc' | 'updated-desc' | 'updated-asc';
+
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: 'alpha-asc',    label: 'A → Z' },
+  { value: 'alpha-desc',   label: 'Z → A' },
+  { value: 'updated-desc', label: 'Most recent post' },
+  { value: 'updated-asc',  label: 'Oldest post' },
+];
+
+const SORT_STORAGE_KEY = 'feedwire-feed-sort';
+
+function loadSortOrder(): SortOrder {
+  try {
+    const stored = localStorage.getItem(SORT_STORAGE_KEY);
+    if (stored && SORT_OPTIONS.some(o => o.value === stored)) {
+      return stored as SortOrder;
+    }
+  } catch {}
+  return 'alpha-asc';
+}
+
+function sortFeeds(feeds: Feed[], order: SortOrder): Feed[] {
+  const copy = [...feeds];
+  switch (order) {
+    case 'alpha-asc':
+      return copy.sort((a, b) => a.title.localeCompare(b.title));
+    case 'alpha-desc':
+      return copy.sort((a, b) => b.title.localeCompare(a.title));
+    case 'updated-desc':
+      return copy.sort((a, b) => {
+        const ta = a.latest_article_at ? new Date(a.latest_article_at).getTime() : 0;
+        const tb = b.latest_article_at ? new Date(b.latest_article_at).getTime() : 0;
+        return tb - ta;
+      });
+    case 'updated-asc':
+      return copy.sort((a, b) => {
+        const ta = a.latest_article_at ? new Date(a.latest_article_at).getTime() : Infinity;
+        const tb = b.latest_article_at ? new Date(b.latest_article_at).getTime() : Infinity;
+        return ta - tb;
+      });
+  }
+}
 
 interface SidebarProps {
   feeds: Feed[];
@@ -28,7 +72,15 @@ export function Sidebar({
   onRefreshAll,
   loading
 }: SidebarProps) {
+  const [sortOrder, setSortOrder] = useState<SortOrder>(loadSortOrder);
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+
+  const sortedFeeds = useMemo(() => sortFeeds(feeds, sortOrder), [feeds, sortOrder]);
+
+  const handleSortChange = (order: SortOrder) => {
+    setSortOrder(order);
+    try { localStorage.setItem(SORT_STORAGE_KEY, order); } catch {}
+  };
 
   return (
     <div className="sidebar">
@@ -98,6 +150,23 @@ export function Sidebar({
 
       <div className="sidebar-section-divider" />
 
+      {/* Sort control — only shown when there are feeds */}
+      {feeds.length > 0 && (
+        <div className="sidebar-sort">
+          <ArrowUpDown size={11} className="sidebar-sort-icon" />
+          <select
+            className="sidebar-sort-select"
+            value={sortOrder}
+            onChange={e => handleSortChange(e.target.value as SortOrder)}
+            title="Sort feeds"
+          >
+            {SORT_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="list">
         {feeds.length === 0 ? (
           <div className="empty-state">
@@ -111,7 +180,7 @@ export function Sidebar({
             </button>
           </div>
         ) : (
-          feeds.map(feed => (
+          sortedFeeds.map(feed => (
             <div
               key={feed.id}
               className={`list-item ${selectedView === 'feed' && selectedFeed?.id === feed.id ? 'active' : ''}`}

@@ -677,6 +677,41 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Sidebar sort control ── */
+.sidebar-sort {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.sidebar-sort-icon {
+  color: var(--macos-text-tertiary);
+  flex-shrink: 0;
+}
+
+.sidebar-sort-select {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 4px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-system);
+  color: var(--macos-text-secondary);
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  /* Let the native picker handle arrow on macOS */
+  -webkit-appearance: auto;
+  appearance: auto;
+}
+
+.sidebar-sort-select:hover {
+  color: var(--macos-text-primary);
+}
+
 /* ── Theme Segment Control ── */
 .theme-segment {
   display: inline-flex;
