@@ -5,32 +5,23 @@ use crate::db::models::{NewFeed, NewArticle};
 use crate::db::DatabaseError;
 use chrono::{DateTime, Utc, Timelike};
 
-/// Derive an icon URL for a feed.
-/// Priority: feed logo/icon field → Google favicon service for the feed's domain.
-fn derive_icon_url(parsed_feed: &feed_rs::model::Feed, feed_url: &str) -> Option<String> {
-    // 1. Use the logo or icon declared in the feed itself (often a high-res channel art or avatar)
-    if let Some(logo) = &parsed_feed.logo {
-        if !logo.uri.is_empty() {
-            return Some(logo.uri.clone());
-        }
+/// Extract the channel_id from a YouTube RSS feed URL.
+/// e.g. https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxx → "UCxxxxxxxx"
+fn youtube_channel_id_from_feed_url(feed_url: &str) -> Option<String> {
+    let parsed = Url::parse(feed_url).ok()?;
+    if !parsed.domain().map(|d| d.contains("youtube.com")).unwrap_or(false) {
+        return None;
     }
-    if let Some(icon) = &parsed_feed.icon {
-        if !icon.uri.is_empty() {
-            return Some(icon.uri.clone());
-        }
-    }
+    parsed.query_pairs()
+        .find(|(k, _)| k == "channel_id")
+        .map(|(_, v)| v.into_owned())
+}
 
-    // 2. Fall back to Google's favicon service for the feed's domain
-    if let Ok(parsed_url) = Url::parse(feed_url) {
-        if let Some(domain) = parsed_url.domain() {
-            return Some(format!(
-                "https://www.google.com/s2/favicons?domain={}&sz=64",
-                domain
-            ));
-        }
-    }
-
-    None
+/// Fallback favicon URL via Google's service.
+fn favicon_url(feed_url: &str) -> Option<String> {
+    let parsed = Url::parse(feed_url).ok()?;
+    let domain = parsed.domain()?;
+    Some(format!("https://www.google.com/s2/favicons?domain={}&sz=64", domain))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -73,7 +64,7 @@ impl FeedParser {
             feed_rs::model::FeedType::RSS0 | feed_rs::model::FeedType::RSS1 | feed_rs::model::FeedType::RSS2 => "rss",
         };
 
-        let icon_url = derive_icon_url(&parsed_feed, url);
+        let icon_url = self.derive_icon_url(&parsed_feed, url).await;
 
         Ok(NewFeed {
             title: parsed_feed.title.map(|t| t.content).unwrap_or_else(|| "Untitled Feed".to_string()),
@@ -97,7 +88,7 @@ impl FeedParser {
             feed_rs::model::FeedType::RSS0 | feed_rs::model::FeedType::RSS1 | feed_rs::model::FeedType::RSS2 => "rss",
         };
 
-        let icon_url = derive_icon_url(&parsed_feed, url);
+        let icon_url = self.derive_icon_url(&parsed_feed, url).await;
 
         let new_feed = NewFeed {
             title: parsed_feed.title.map(|t| t.content).unwrap_or_else(|| "Untitled Feed".to_string()),
@@ -147,6 +138,62 @@ impl FeedParser {
         }
 
         Ok((new_feed, articles))
+    }
+
+    /// Fetch the channel avatar URL for a YouTube channel by scraping the channel page.
+    /// Returns None if the request fails or the avatar pattern isn't found.
+    async fn fetch_youtube_avatar(&self, channel_id: &str) -> Option<String> {
+        let channel_url = format!("https://www.youtube.com/channel/{}", channel_id);
+        let html = self.client
+            .get(&channel_url)
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .send()
+            .await
+            .ok()?
+            .text()
+            .await
+            .ok()?;
+
+        // YouTube page structure (as of 2026):
+        // "avatar":{"avatarViewModel":{"image":{"sources":[{"url":"https://yt3.googleusercontent.com/...
+        let marker = r#""avatar":{"avatarViewModel":{"image":{"sources":[{"url":""#;
+        let start = html.find(marker)? + marker.len();
+        let end = html[start..].find('"')? + start;
+        let url = &html[start..end];
+        if url.starts_with("https://") {
+            Some(url.to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Determine the best icon URL for a feed.
+    /// For YouTube feeds: scrape the channel avatar from the channel page.
+    /// For everything else: Google favicon service.
+    async fn derive_icon_url(&self, parsed_feed: &feed_rs::model::Feed, feed_url: &str) -> Option<String> {
+        // YouTube: scrape the real channel avatar
+        if let Some(channel_id) = youtube_channel_id_from_feed_url(feed_url) {
+            if let Some(avatar) = self.fetch_youtube_avatar(&channel_id).await {
+                return Some(avatar);
+            }
+        }
+
+        // Non-YouTube: use declared logo/icon if present
+        if let Some(logo) = &parsed_feed.logo {
+            if !logo.uri.is_empty() {
+                return Some(logo.uri.clone());
+            }
+        }
+        if let Some(icon) = &parsed_feed.icon {
+            if !icon.uri.is_empty() {
+                return Some(icon.uri.clone());
+            }
+        }
+
+        // Final fallback: Google favicon service
+        favicon_url(feed_url)
     }
 
     pub async fn is_youtube_channel(&self, url: &str) -> bool {
