@@ -38,26 +38,34 @@ function saveCollapsed(s: Set<string>) {
   try { localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...s])); } catch {}
 }
 
-function sortFeeds(feeds: Feed[], order: SortOrder): Feed[] {
+function sortFeeds(feeds: Feed[], order: SortOrder, unreadCounts: Record<string, number>): Feed[] {
   const copy = [...feeds];
-  switch (order) {
-    case 'alpha-asc':
-      return copy.sort((a, b) => a.title.localeCompare(b.title));
-    case 'alpha-desc':
-      return copy.sort((a, b) => b.title.localeCompare(a.title));
-    case 'updated-desc':
-      return copy.sort((a, b) => {
+
+  const byOrder = (a: Feed, b: Feed): number => {
+    switch (order) {
+      case 'alpha-asc':   return a.title.localeCompare(b.title);
+      case 'alpha-desc':  return b.title.localeCompare(a.title);
+      case 'updated-desc': {
         const ta = a.latest_article_at ? new Date(a.latest_article_at).getTime() : 0;
         const tb = b.latest_article_at ? new Date(b.latest_article_at).getTime() : 0;
         return tb - ta;
-      });
-    case 'updated-asc':
-      return copy.sort((a, b) => {
+      }
+      case 'updated-asc': {
         const ta = a.latest_article_at ? new Date(a.latest_article_at).getTime() : Infinity;
         const tb = b.latest_article_at ? new Date(b.latest_article_at).getTime() : Infinity;
         return ta - tb;
-      });
-  }
+      }
+    }
+  };
+
+  return copy.sort((a, b) => {
+    // Primary: feeds with unread items float to the top
+    const aUnread = (unreadCounts[a.id] ?? 0) > 0 ? 0 : 1;
+    const bUnread = (unreadCounts[b.id] ?? 0) > 0 ? 0 : 1;
+    if (aUnread !== bUnread) return aUnread - bUnread;
+    // Tiebreaker: user-chosen sort order
+    return byOrder(a, b);
+  });
 }
 
 // ── Context menu state ───────────────────────────────────────────────────────
@@ -181,7 +189,7 @@ export function Sidebar({
     const filtered = isSearching
       ? feeds.filter(f => f.title.toLowerCase().includes(q))
       : feeds;
-    const sorted = sortFeeds(filtered, sortOrder);
+    const sorted = sortFeeds(filtered, sortOrder, unreadCounts);
     const ungrouped = sorted.filter(f => !f.folder_id);
     // When searching, flatten everything — no folder grouping
     if (isSearching) {
@@ -192,7 +200,7 @@ export function Sidebar({
       feeds: sorted.filter(f => f.folder_id === folder.id),
     }));
     return { ungrouped, grouped, isSearching };
-  }, [feeds, folders, sortOrder, searchQuery]);
+  }, [feeds, folders, sortOrder, searchQuery, unreadCounts]);
 
   return (
     <div className="sidebar">
