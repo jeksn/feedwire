@@ -337,6 +337,19 @@ mod tests {
         assert!(!parser.is_youtube_channel("https://example.com/feed.xml").await);
     }
 
+    // ── fetch_youtube_avatar ──────────────────────────────────────────────────
+    #[tokio::test]
+    #[ignore = "makes a live network request"]
+    async fn youtube_avatar_fetched() {
+        let parser = FeedParser::new();
+        // Gartner for Marketing channel — stable public channel
+        let result = parser.fetch_youtube_avatar("UCBcRF18a7Qf58cCRy5xuWwQ").await;
+        println!("avatar URL: {:?}", result);
+        assert!(result.is_some(), "expected avatar URL, got None");
+        let url = result.unwrap();
+        assert!(url.starts_with("https://yt3.googleusercontent.com/"), "unexpected URL: {}", url);
+    }
+
     // ── convert_youtube_to_rss ─────────────────────────────────────────────
 
     #[tokio::test]

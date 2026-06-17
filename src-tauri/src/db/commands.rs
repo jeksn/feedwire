@@ -273,8 +273,14 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
         .take(MAX_INITIAL_ARTICLES)
         .collect();
 
-    // Backfill icon_url for feeds added before this feature
-    let icon_url = if existing_icon_url.is_none() { new_feed_meta.icon_url } else { None };
+    // Backfill icon_url if:
+    // - it was never set (NULL), or
+    // - it's the generic YouTube favicon fallback (meaning the real channel avatar
+    //   wasn't scraped yet, e.g. feeds added before fetch_youtube_avatar was added)
+    let needs_icon_backfill = existing_icon_url.as_deref()
+        .map(|u| u.is_empty() || (u.contains("google.com/s2/favicons") && u.contains("youtube.com")))
+        .unwrap_or(true); // None → needs backfill
+    let icon_url = if needs_icon_backfill { new_feed_meta.icon_url } else { None };
 
     // Write articles — lock held only for DB operations
     let db_guard = db.lock().await;
