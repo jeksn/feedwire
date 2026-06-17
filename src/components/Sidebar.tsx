@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus, RefreshCw, Rss, Bookmark, Inbox, Settings,
-  ArrowUpDown, ChevronRight, Folder as FolderIcon,
+  ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X,
 } from 'lucide-react';
 import type { Feed, Folder } from '../types';
 import { feedApi } from '../api/feed';
@@ -110,6 +110,8 @@ export function Sidebar({
   const [folders, setFolders] = useState<Folder[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [folderContextMenu, setFolderContextMenu] = useState<FolderContextMenuState | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const totalUnread = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
@@ -172,16 +174,25 @@ export function Sidebar({
     setFolderContextMenu({ folder, x: e.clientX, y: e.clientY });
   };
 
-  // Group feeds by folder, sorting within each group
-  const { ungrouped, grouped } = useMemo(() => {
-    const sorted = sortFeeds(feeds, sortOrder);
+  // Group feeds by folder, applying search filter and sort within each group
+  const { ungrouped, grouped, isSearching } = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const isSearching = q.length > 0;
+    const filtered = isSearching
+      ? feeds.filter(f => f.title.toLowerCase().includes(q))
+      : feeds;
+    const sorted = sortFeeds(filtered, sortOrder);
     const ungrouped = sorted.filter(f => !f.folder_id);
+    // When searching, flatten everything — no folder grouping
+    if (isSearching) {
+      return { ungrouped: sorted, grouped: [], isSearching };
+    }
     const grouped: { folder: Folder; feeds: Feed[] }[] = folders.map(folder => ({
       folder,
       feeds: sorted.filter(f => f.folder_id === folder.id),
     }));
-    return { ungrouped, grouped };
-  }, [feeds, folders, sortOrder]);
+    return { ungrouped, grouped, isSearching };
+  }, [feeds, folders, sortOrder, searchQuery]);
 
   return (
     <div className="sidebar">
@@ -250,6 +261,29 @@ export function Sidebar({
       <div className="sidebar-section-divider" />
 
       {feeds.length > 0 && (
+        <div className="sidebar-search">
+          <Search size={12} className="sidebar-search-icon" />
+          <input
+            ref={searchInputRef}
+            className="sidebar-search-input"
+            placeholder="Search feeds…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Escape' && setSearchQuery('')}
+          />
+          {searchQuery && (
+            <button
+              className="sidebar-search-clear"
+              onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+              title="Clear search"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {feeds.length > 0 && !isSearching && (
         <div className="sidebar-sort">
           <ArrowUpDown size={11} className="sidebar-sort-icon" />
           <select
@@ -276,6 +310,10 @@ export function Sidebar({
             <button className="btn btn-primary mt-md" onClick={onAddFeed}>
               Add Feed
             </button>
+          </div>
+        ) : isSearching && ungrouped.length === 0 ? (
+          <div className="sidebar-search-empty">
+            No feeds match "{searchQuery}"
           </div>
         ) : (
           <>

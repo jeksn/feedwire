@@ -843,6 +843,75 @@ body {
   line-height: 1.4;
 }
 
+/* ── Sidebar search bar ── */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px var(--spacing-md) 2px;
+  padding: 0 8px;
+  height: 26px;
+  background: var(--macos-bg-secondary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.sidebar-search:focus-within {
+  border-color: var(--macos-accent);
+}
+
+.sidebar-search-icon {
+  flex-shrink: 0;
+  color: var(--macos-text-tertiary);
+}
+
+.sidebar-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-system);
+  color: var(--macos-text-primary);
+}
+
+.sidebar-search-input::placeholder {
+  color: var(--macos-text-tertiary);
+}
+
+.sidebar-search-clear {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--macos-text-tertiary);
+  border: none;
+  cursor: pointer;
+  color: var(--macos-bg-primary);
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.sidebar-search-clear:hover {
+  opacity: 1;
+}
+
+.sidebar-search-empty {
+  padding: var(--spacing-md);
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-tertiary);
+  text-align: center;
+  line-height: 1.5;
+}
+
 /* ── Sidebar sort control ── */
 .sidebar-sort {
   display: flex;
