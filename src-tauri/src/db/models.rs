@@ -69,7 +69,7 @@ pub struct Feed {
     pub title: String,
     pub url: String,
     pub description: Option<String>,
-    pub feed_type: String, // "rss" or "atom"
+    pub feed_type: String, // "rss", "atom", "json"
     pub last_fetched: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -79,6 +79,9 @@ pub struct Feed {
     /// Most recent article published_at across all articles for this feed.
     /// NULL when the feed has no articles yet.
     pub latest_article_at: Option<DateTime<Utc>>,
+    /// URL to the feed's avatar/favicon.
+    /// YouTube feeds: channel thumbnail. Others: Google favicon service URL.
+    pub icon_url: Option<String>,
 }
 
 // ── Folders ──────────────────────────────────────────────────────────────────
@@ -120,6 +123,7 @@ pub struct NewFeed {
     pub url: String,
     pub description: Option<String>,
     pub feed_type: String,
+    pub icon_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +144,7 @@ pub struct FeedUpdate {
     pub description: Option<String>,
     pub last_fetched: Option<DateTime<Utc>>,
     pub is_active: Option<bool>,
+    pub icon_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

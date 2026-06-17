@@ -5,6 +5,34 @@ use crate::db::models::{NewFeed, NewArticle};
 use crate::db::DatabaseError;
 use chrono::{DateTime, Utc, Timelike};
 
+/// Derive an icon URL for a feed.
+/// Priority: feed logo/icon field → Google favicon service for the feed's domain.
+fn derive_icon_url(parsed_feed: &feed_rs::model::Feed, feed_url: &str) -> Option<String> {
+    // 1. Use the logo or icon declared in the feed itself (often a high-res channel art or avatar)
+    if let Some(logo) = &parsed_feed.logo {
+        if !logo.uri.is_empty() {
+            return Some(logo.uri.clone());
+        }
+    }
+    if let Some(icon) = &parsed_feed.icon {
+        if !icon.uri.is_empty() {
+            return Some(icon.uri.clone());
+        }
+    }
+
+    // 2. Fall back to Google's favicon service for the feed's domain
+    if let Ok(parsed_url) = Url::parse(feed_url) {
+        if let Some(domain) = parsed_url.domain() {
+            return Some(format!(
+                "https://www.google.com/s2/favicons?domain={}&sz=64",
+                domain
+            ));
+        }
+    }
+
+    None
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum FeedError {
     #[error("HTTP error: {0}")]
@@ -45,11 +73,14 @@ impl FeedParser {
             feed_rs::model::FeedType::RSS0 | feed_rs::model::FeedType::RSS1 | feed_rs::model::FeedType::RSS2 => "rss",
         };
 
+        let icon_url = derive_icon_url(&parsed_feed, url);
+
         Ok(NewFeed {
             title: parsed_feed.title.map(|t| t.content).unwrap_or_else(|| "Untitled Feed".to_string()),
             url: url.to_string(),
             description: parsed_feed.description.map(|d| d.content),
             feed_type: feed_type.to_string(),
+            icon_url,
         })
     }
 
@@ -66,11 +97,14 @@ impl FeedParser {
             feed_rs::model::FeedType::RSS0 | feed_rs::model::FeedType::RSS1 | feed_rs::model::FeedType::RSS2 => "rss",
         };
 
+        let icon_url = derive_icon_url(&parsed_feed, url);
+
         let new_feed = NewFeed {
             title: parsed_feed.title.map(|t| t.content).unwrap_or_else(|| "Untitled Feed".to_string()),
             url: url.to_string(),
             description: parsed_feed.description.map(|d| d.content),
             feed_type: feed_type.to_string(),
+            icon_url,
         };
 
         let mut articles = Vec::new();

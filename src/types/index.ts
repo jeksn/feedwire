@@ -12,6 +12,8 @@ export interface Feed {
   folder_id?: string | null;
   /** ISO timestamp of the most recently published article for this feed. */
   latest_article_at?: string;
+  /** URL for the feed's avatar/favicon. */
+  icon_url?: string | null;
 }
 
 export interface Article {

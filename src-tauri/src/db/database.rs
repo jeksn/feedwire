@@ -152,6 +152,14 @@ impl Database {
         .await;
         // Ignore error — column already exists on new DBs created after this migration
 
+        // Add icon_url to feeds if it doesn't exist yet (safe on existing DBs)
+        let _ = sqlx::query(
+            "ALTER TABLE feeds ADD COLUMN icon_url TEXT"
+        )
+        .execute(&self.pool)
+        .await;
+        // Ignore error — column already exists on new DBs created after this migration
+
         Ok(())
     }
 
@@ -172,12 +180,13 @@ impl Database {
             is_active: true,
             folder_id: None,
             latest_article_at: None,
+            icon_url: feed.icon_url,
         };
 
         sqlx::query(
             r#"
-            INSERT INTO feeds (id, title, url, description, feed_type, last_fetched, created_at, updated_at, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO feeds (id, title, url, description, feed_type, last_fetched, created_at, updated_at, is_active, icon_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&feed.id)
@@ -189,6 +198,7 @@ impl Database {
         .bind(&feed.created_at)
         .bind(&feed.updated_at)
         .bind(feed.is_active)
+        .bind(&feed.icon_url)
         .execute(&self.pool)
         .await?;
 
@@ -202,7 +212,8 @@ impl Database {
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
                 f.folder_id,
-                MAX(a.published_at) AS latest_article_at
+                MAX(a.published_at) AS latest_article_at,
+                f.icon_url
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
             WHERE f.is_active = 1
@@ -223,7 +234,8 @@ impl Database {
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
                 f.folder_id,
-                MAX(a.published_at) AS latest_article_at
+                MAX(a.published_at) AS latest_article_at,
+                f.icon_url
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
             WHERE f.id = ? AND f.is_active = 1
@@ -247,6 +259,7 @@ impl Database {
         if let Some(v) = update.description  { set_clauses.push("description = ?".into());  params.push(v); }
         if let Some(v) = update.last_fetched { set_clauses.push("last_fetched = ?".into()); params.push(v.to_rfc3339()); }
         if let Some(v) = update.is_active    { set_clauses.push("is_active = ?".into());    params.push(if v { "1" } else { "0" }.into()); }
+        if let Some(v) = update.icon_url     { set_clauses.push("icon_url = ?".into());     params.push(v); }
 
         let query = format!("UPDATE feeds SET {} WHERE id = ?", set_clauses.join(", "));
         params.push(id.to_string());
@@ -268,7 +281,8 @@ impl Database {
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
                 f.folder_id,
-                MAX(a.published_at) AS latest_article_at
+                MAX(a.published_at) AS latest_article_at,
+                f.icon_url
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
             WHERE f.url = ?

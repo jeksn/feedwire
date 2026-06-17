@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus, RefreshCw, Rss, Bookmark, Inbox, Settings,
-  ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X,
+  ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X, Eye,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import type { Feed, Folder } from '../types';
@@ -22,8 +22,28 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: 'updated-asc',  label: 'Oldest post' },
 ];
 
-const SORT_STORAGE_KEY    = 'feedwire-feed-sort';
-const COLLAPSE_STORAGE_KEY = 'feedwire-folder-collapsed';
+const SORT_STORAGE_KEY      = 'feedwire-feed-sort';
+const COLLAPSE_STORAGE_KEY  = 'feedwire-folder-collapsed';
+const VIEW_OPTS_STORAGE_KEY = 'feedwire-view-opts';
+
+interface ViewOptions {
+  showAvatar:   boolean;
+  showTypeBadge: boolean;
+}
+
+const DEFAULT_VIEW_OPTIONS: ViewOptions = { showAvatar: false, showTypeBadge: false };
+
+function loadViewOptions(): ViewOptions {
+  try {
+    const stored = localStorage.getItem(VIEW_OPTS_STORAGE_KEY);
+    if (stored) return { ...DEFAULT_VIEW_OPTIONS, ...JSON.parse(stored) };
+  } catch {}
+  return { ...DEFAULT_VIEW_OPTIONS };
+}
+
+function saveViewOptions(opts: ViewOptions) {
+  try { localStorage.setItem(VIEW_OPTS_STORAGE_KEY, JSON.stringify(opts)); } catch {}
+}
 
 function loadSortOrder(): SortOrder {
   try {
@@ -122,6 +142,8 @@ export function Sidebar({
 }: SidebarProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>(loadSortOrder);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
+  const [viewOptions, setViewOptions] = useState<ViewOptions>(loadViewOptions);
+  const [showViewMenu, setShowViewMenu] = useState(false);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [folderContextMenu, setFolderContextMenu] = useState<FolderContextMenuState | null>(null);
@@ -129,6 +151,7 @@ export function Sidebar({
   const [progress, setProgress] = useState<RefreshProgress | null>(null);
   const doneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const viewMenuRef = useRef<HTMLDivElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const totalUnread = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
@@ -175,6 +198,26 @@ export function Sidebar({
       document.removeEventListener('scroll', close, true);
     };
   }, [folderContextMenu]);
+
+  // Close view-options menu on outside click
+  useEffect(() => {
+    if (!showViewMenu) return;
+    const close = (e: MouseEvent) => {
+      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target as Node)) {
+        setShowViewMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showViewMenu]);
+
+  const toggleViewOption = (key: keyof ViewOptions) => {
+    setViewOptions(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      saveViewOptions(next);
+      return next;
+    });
+  };
 
   const handleSortChange = (order: SortOrder) => {
     setSortOrder(order);
@@ -315,18 +358,50 @@ export function Sidebar({
       )}
 
       {feeds.length > 0 && !isSearching && (
-        <div className="sidebar-sort">
-          <ArrowUpDown size={11} className="sidebar-sort-icon" />
-          <select
-            className="sidebar-sort-select"
-            value={sortOrder}
-            onChange={e => handleSortChange(e.target.value as SortOrder)}
-            title="Sort feeds"
-          >
-            {SORT_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+        <div className="sidebar-controls">
+          <div className="sidebar-sort">
+            <ArrowUpDown size={11} className="sidebar-sort-icon" />
+            <select
+              className="sidebar-sort-select"
+              value={sortOrder}
+              onChange={e => handleSortChange(e.target.value as SortOrder)}
+              title="Sort feeds"
+            >
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sidebar-view-menu-wrap" ref={viewMenuRef}>
+            <button
+              className={`sidebar-view-btn${showViewMenu ? ' active' : ''}`}
+              onClick={() => setShowViewMenu(v => !v)}
+              title="View options"
+            >
+              <Eye size={11} />
+            </button>
+            {showViewMenu && (
+              <div className="sidebar-view-menu">
+                <label className="sidebar-view-option">
+                  <input
+                    type="checkbox"
+                    checked={viewOptions.showAvatar}
+                    onChange={() => toggleViewOption('showAvatar')}
+                  />
+                  Show feed picture
+                </label>
+                <label className="sidebar-view-option">
+                  <input
+                    type="checkbox"
+                    checked={viewOptions.showTypeBadge}
+                    onChange={() => toggleViewOption('showTypeBadge')}
+                  />
+                  Show feed type
+                </label>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -379,6 +454,8 @@ export function Sidebar({
                     onSelect={onFeedSelect}
                     onContextMenu={handleContextMenu}
                     indented
+                    showAvatar={viewOptions.showAvatar}
+                    showTypeBadge={viewOptions.showTypeBadge}
                   />
                 ))}
               </div>
@@ -394,6 +471,8 @@ export function Sidebar({
                 onSelect={onFeedSelect}
                 onContextMenu={handleContextMenu}
                 indented={false}
+                showAvatar={viewOptions.showAvatar}
+                showTypeBadge={viewOptions.showTypeBadge}
               />
             ))}
           </>
@@ -466,17 +545,77 @@ interface FeedRowProps {
   onSelect: (feed: Feed) => void;
   onContextMenu: (e: React.MouseEvent, feedId: string) => void;
   indented: boolean;
+  showAvatar: boolean;
+  showTypeBadge: boolean;
 }
 
-function FeedRow({ feed, isActive, unreadCount, onSelect, onContextMenu, indented }: FeedRowProps) {
+/** Derive a colour from the feed title for the initial-circle fallback. */
+function avatarColor(title: string): string {
+  const colours = [
+    '#e05d5d', '#e07a5d', '#e0a35d', '#d4c050',
+    '#6ab04c', '#4caf88', '#4ca8af', '#4c82e0',
+    '#7b5de0', '#c45de0', '#e05da7',
+  ];
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
+  return colours[Math.abs(hash) % colours.length];
+}
+
+function FeedAvatar({ feed }: { feed: Feed }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const initial = (feed.title.trim()[0] ?? '?').toUpperCase();
+
+  if (feed.icon_url && !imgFailed) {
+    return (
+      <img
+        className="feed-avatar"
+        src={feed.icon_url}
+        alt=""
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+  return (
+    <span
+      className="feed-avatar feed-avatar--initial"
+      style={{ background: avatarColor(feed.title) }}
+    >
+      {initial}
+    </span>
+  );
+}
+
+/** Inline SVG icons — monochrome, minimal. */
+const YouTubeIcon = () => (
+  <svg className="feed-type-badge feed-type-badge--youtube" viewBox="0 0 20 14" fill="currentColor" aria-hidden="true">
+    <path d="M19.6 2.2A2.5 2.5 0 0 0 17.8.4C16.2 0 10 0 10 0S3.8 0 2.2.4A2.5 2.5 0 0 0 .4 2.2C0 3.8 0 7 0 7s0 3.2.4 4.8a2.5 2.5 0 0 0 1.8 1.8C3.8 14 10 14 10 14s6.2 0 7.8-.4a2.5 2.5 0 0 0 1.8-1.8C20 10.2 20 7 20 7s0-3.2-.4-4.8zM8 10V4l5.3 3L8 10z"/>
+  </svg>
+);
+
+const RssIcon = () => (
+  <svg className="feed-type-badge feed-type-badge--rss" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+    <circle cx="3.5" cy="16.5" r="2.5"/>
+    <path d="M1 8.5A.5.5 0 0 1 1.5 8 10.5 10.5 0 0 1 12 18.5a.5.5 0 0 1-1 0A9.5 9.5 0 0 0 1.5 9.5.5.5 0 0 1 1 9v-.5z"/>
+    <path d="M1 3.5A.5.5 0 0 1 1.5 3 15.5 15.5 0 0 1 17 18.5a.5.5 0 0 1-1 0A14.5 14.5 0 0 0 1.5 4.5.5.5 0 0 1 1 4v-.5z"/>
+  </svg>
+);
+
+function FeedTypeBadge({ feed }: { feed: Feed }) {
+  const isYouTube = feed.url.includes('youtube.com') || feed.url.includes('youtu.be');
+  return isYouTube ? <YouTubeIcon /> : <RssIcon />;
+}
+
+function FeedRow({ feed, isActive, unreadCount, onSelect, onContextMenu, indented, showAvatar, showTypeBadge }: FeedRowProps) {
   return (
     <div
-      className={`list-item${isActive ? ' active' : ''}${indented ? ' list-item--indented' : ''}`}
+      className={`list-item${isActive ? ' active' : ''}${indented ? ' list-item--indented' : ''}${showAvatar ? ' list-item--with-avatar' : ''}`}
       onClick={() => onSelect(feed)}
       onContextMenu={e => onContextMenu(e, feed.id)}
     >
       <div className="feed-item">
+        {showAvatar && <FeedAvatar feed={feed} />}
         <div className="feed-title truncate">{feed.title}</div>
+        {showTypeBadge && <FeedTypeBadge feed={feed} />}
         {unreadCount > 0 && (
           <span className="feed-unread-count">{unreadCount}</span>
         )}

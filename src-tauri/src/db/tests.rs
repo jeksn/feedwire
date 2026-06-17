@@ -18,6 +18,7 @@ fn new_feed(title: &str, url: &str) -> NewFeed {
         url: url.to_string(),
         description: Some(format!("Description for {}", title)),
         feed_type: "rss".to_string(),
+        icon_url: None,
     }
 }
 

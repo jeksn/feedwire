@@ -933,13 +933,21 @@ body {
   line-height: 1.5;
 }
 
-/* ── Sidebar sort control ── */
+/* ── Sidebar controls row (sort + view options) ── */
+.sidebar-controls {
+  display: flex;
+  align-items: center;
+  padding: 4px var(--spacing-md) 4px calc(var(--spacing-md) - 2px);
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .sidebar-sort {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 4px var(--spacing-md);
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .sidebar-sort-icon {
@@ -959,13 +967,123 @@ body {
   border: none;
   outline: none;
   cursor: pointer;
-  /* Let the native picker handle arrow on macOS */
   -webkit-appearance: auto;
   appearance: auto;
 }
 
 .sidebar-sort-select:hover {
   color: var(--macos-text-primary);
+}
+
+/* ── View options button + dropdown ── */
+.sidebar-view-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebar-view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--macos-text-tertiary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-view-btn:hover,
+.sidebar-view-btn.active {
+  background: var(--macos-bg-secondary);
+  color: var(--macos-text-primary);
+}
+
+.sidebar-view-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 200;
+  min-width: 160px;
+  background: var(--macos-bg-primary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 4px 0;
+}
+
+.sidebar-view-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-view-option:hover {
+  background: var(--macos-bg-secondary);
+}
+
+.sidebar-view-option input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--macos-accent);
+}
+
+/* ── Feed avatar ── */
+.feed-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.feed-avatar--initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: 0;
+  border-radius: 4px;
+}
+
+/* Slightly taller row when avatar is shown */
+.list-item--with-avatar .feed-item {
+  gap: 7px;
+}
+
+/* ── Feed type badge (RSS / YouTube SVG icons) ── */
+.feed-type-badge {
+  flex-shrink: 0;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.list-item:hover .feed-type-badge,
+.list-item.active .feed-type-badge {
+  opacity: 0.6;
+}
+
+.feed-type-badge--rss {
+  width: 11px;
+  height: 11px;
+  color: var(--macos-text-secondary);
+}
+
+.feed-type-badge--youtube {
+  width: 14px;
+  height: 10px;
+  color: var(--macos-text-secondary);
 }
 
 /* ── Theme Segment Control ── */

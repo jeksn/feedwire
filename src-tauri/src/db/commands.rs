@@ -248,23 +248,23 @@ pub async fn get_unread_count(feed_id: Option<String>, db: State<'_, DbState>) -
 }
 
 async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Read feed URL + filter settings — brief lock
-    let (feed_url, skip_shorts, rules) = {
+    // Read feed URL, existing icon_url, + filter settings — brief lock
+    let (feed_url, existing_icon_url, skip_shorts, rules) = {
         let db_guard = db.lock().await;
-        let url = db_guard.get_feed_by_id(&feed_id).await?.url;
+        let feed = db_guard.get_feed_by_id(&feed_id).await?;
         let skip_shorts = db_guard
             .get_setting(SETTING_SKIP_YOUTUBE_SHORTS)
             .await?
             .map(|v| v == "true")
             .unwrap_or(false);
         let rules = db_guard.get_filter_rules().await?;
-        (url, skip_shorts, rules)
+        (feed.url, feed.icon_url, skip_shorts, rules)
     };
 
     // Network call — no lock held
     const MAX_INITIAL_ARTICLES: usize = 15;
     let parser = FeedParser::new();
-    let (_, articles) = parser.fetch_feed(&feed_url).await?;
+    let (new_feed_meta, articles) = parser.fetch_feed(&feed_url).await?;
 
     // Apply filters before persisting
     let filtered: Vec<_> = articles
@@ -272,6 +272,9 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
         .filter(|a| should_keep(a, skip_shorts, &rules))
         .take(MAX_INITIAL_ARTICLES)
         .collect();
+
+    // Backfill icon_url for feeds added before this feature
+    let icon_url = if existing_icon_url.is_none() { new_feed_meta.icon_url } else { None };
 
     // Write articles — lock held only for DB operations
     let db_guard = db.lock().await;
@@ -281,6 +284,7 @@ async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Resul
     }
     let update = FeedUpdate {
         last_fetched: Some(chrono::Utc::now()),
+        icon_url,
         ..Default::default()
     };
     db_guard.update_feed(&feed_id, update).await?;
@@ -573,6 +577,7 @@ impl Default for FeedUpdate {
             description: None,
             last_fetched: None,
             is_active: None,
+            icon_url: None,
         }
     }
 }
