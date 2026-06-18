@@ -1,9 +1,10 @@
-import { Bookmark, BookmarkCheck, ExternalLink, Calendar, User } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ExternalLink, Calendar, Rss } from 'lucide-react';
 import { openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
-import type { Article } from '../types';
+import type { Article, Feed } from '../types';
 
 interface ContentPaneProps {
   article: Article | null;
+  feeds?: Feed[];
   onToggleBookmark: (articleId: string) => void;
 }
 
@@ -11,7 +12,10 @@ function openUrl(url: string) {
   tauriOpenUrl(url).catch(console.error);
 }
 
-export function ContentPane({ article, onToggleBookmark }: ContentPaneProps) {
+export function ContentPane({ article, feeds, onToggleBookmark }: ContentPaneProps) {
+  const feedName = article
+    ? (feeds?.find(f => f.id === article.feed_id)?.title ?? null)
+    : null;
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -85,16 +89,21 @@ export function ContentPane({ article, onToggleBookmark }: ContentPaneProps) {
         </div>
 
         <div className="content-meta">
-          {article.author && (
+          {feedName && (
             <div className="flex items-center gap-xs">
-              <User size={14} />
-              <span>{article.author}</span>
+              <Rss size={14} />
+              <span>{feedName}</span>
             </div>
           )}
           {article.published_at && (
             <div className="flex items-center gap-xs">
               <Calendar size={14} />
               <span>{formatDate(article.published_at)}</span>
+            </div>
+          )}
+          {article.author && (
+            <div className="flex items-center gap-xs" style={{ color: 'var(--macos-text-tertiary)' }}>
+              <span>{article.author}</span>
             </div>
           )}
         </div>

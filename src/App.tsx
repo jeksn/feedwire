@@ -403,6 +403,7 @@ function App() {
 
           <ContentPane
             article={selectedArticle}
+            feeds={feeds}
             onToggleBookmark={handleToggleBookmark}
           />
         </>
