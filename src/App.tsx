@@ -394,6 +394,7 @@ function App() {
             onArticleSelect={handleArticleSelect}
             loading={loading}
             selectedFeed={selectedFeed}
+            feeds={feeds}
             title={articleListTitle}
             onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
             onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}

@@ -5,6 +5,25 @@ use crate::db::models::{NewFeed, NewArticle};
 use crate::db::DatabaseError;
 use chrono::{DateTime, Utc, Timelike};
 
+/// Strip HTML tags from a string, collapsing whitespace, for plain-text use.
+fn strip_html_tags(html: &str) -> String {
+    // Remove tags
+    let no_tags = regex::Regex::new(r"<[^>]+>").unwrap()
+        .replace_all(html, " ");
+    // Decode a handful of common HTML entities
+    let decoded = no_tags
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ");
+    // Collapse whitespace
+    regex::Regex::new(r"\s+").unwrap()
+        .replace_all(decoded.trim(), " ")
+        .to_string()
+}
+
 /// Extract the channel_id from a YouTube RSS feed URL.
 /// e.g. https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxx → "UCxxxxxxxx"
 fn youtube_channel_id_from_feed_url(feed_url: &str) -> Option<String> {
@@ -123,9 +142,34 @@ impl FeedParser {
 
             let description = entry.summary.map(|s| s.content);
 
+            // Derive title: prefer the explicit <title>, fall back to the first
+            // ~80 chars of summary/content (stripped of HTML tags), and only
+            // use the generic placeholder as a last resort.
+            let title = entry.title
+                .map(|t| t.content)
+                .filter(|t| !t.trim().is_empty())
+                .or_else(|| {
+                    let raw = description.as_deref()
+                        .or(content.as_deref())
+                        .unwrap_or("");
+                    let plain = strip_html_tags(raw);
+                    let trimmed = plain.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        let truncated = if trimmed.len() > 80 {
+                            format!("{}…", &trimmed[..80].trim_end())
+                        } else {
+                            trimmed.to_string()
+                        };
+                        Some(truncated)
+                    }
+                })
+                .unwrap_or_else(|| "Untitled Article".to_string());
+
             let article = NewArticle {
                 feed_id: String::new(), // Will be set by the caller
-                title: entry.title.map(|t| t.content).unwrap_or_else(|| "Untitled Article".to_string()),
+                title,
                 link: entry.links.first().map(|l| l.href.clone()),
                 description,
                 content,

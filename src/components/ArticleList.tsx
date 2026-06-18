@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { RefreshCw, ExternalLink, CheckCheck, Trash2 } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
@@ -9,6 +9,8 @@ interface ArticleListProps {
   onArticleSelect: (article: Article) => void;
   loading: boolean;
   selectedFeed: Feed | null;
+  /** All known feeds — used to show the source feed name in multi-feed views. */
+  feeds?: Feed[];
   title?: string;
   onRefreshFeed: () => void;
   onMarkAllRead?: () => void;
@@ -21,12 +23,23 @@ export function ArticleList({
   onArticleSelect,
   loading,
   selectedFeed,
+  feeds,
   title,
   onRefreshFeed,
   onMarkAllRead,
   onDeleteFeed
 }: ArticleListProps) {
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Build a fast id→title lookup. Only computed when feeds changes.
+  const feedTitleById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const f of feeds ?? []) map[f.id] = f.title;
+    return map;
+  }, [feeds]);
+
+  // Show source feed badge when viewing across multiple feeds
+  const showFeedBadge = !selectedFeed;
 
   // Scroll the active article row into view whenever selection changes
   useEffect(() => {
@@ -133,6 +146,12 @@ export function ArticleList({
               onClick={() => onArticleSelect(article)}
             >
               <div className="article-header">
+                {showFeedBadge && feedTitleById[article.feed_id] && (
+                  <div className="article-feed-badge">
+                    {feedTitleById[article.feed_id]}
+                  </div>
+                )}
+
                 <div className="article-title">
                   {article.title}
                 </div>

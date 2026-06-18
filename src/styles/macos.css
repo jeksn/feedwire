@@ -358,6 +358,21 @@ body {
   padding: var(--spacing-md);
 }
 
+.article-feed-badge {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--macos-accent);
+  background-color: color-mix(in srgb, var(--macos-accent) 10%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  margin-bottom: var(--spacing-xs);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .article-title {
   font-size: var(--font-size-sm);
   font-weight: 500;
