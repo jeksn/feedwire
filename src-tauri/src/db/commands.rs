@@ -5,7 +5,7 @@ use crate::opml;
 use tauri::{State, AppHandle, Emitter};
 use tauri_plugin_dialog::DialogExt;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct RefreshProgress {
@@ -210,34 +210,62 @@ pub async fn refresh_feed(feed_id: String, db: State<'_, DbState>) -> Result<Vec
     Ok(saved_articles)
 }
 
+const REFRESH_CONCURRENCY: usize = 10;
+
 #[tauri::command]
 pub async fn refresh_all_feeds(app: AppHandle, db: State<'_, DbState>) -> Result<Vec<String>, String> {
-    // Collect feed list first, then drop the lock before refreshing each feed
+    refresh_all_feeds_inner(app, db.inner().clone()).await.map_err(|e| e.to_string())
+}
+
+/// Inner implementation shared by the command and the background timer.
+pub async fn refresh_all_feeds_inner(
+    app: AppHandle,
+    db: Arc<Mutex<Database>>,
+) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+    // Collect feed list — brief lock
     let feeds = {
         let db_guard = db.lock().await;
-        db_guard.get_feeds().await.map_err(|e| e.to_string())?
-        // db_guard dropped here
+        db_guard.get_feeds().await?
     };
 
     let total = feeds.len();
-    let mut done = 0;
-    let mut refreshed_feeds = Vec::new();
+    let sem = Arc::new(Semaphore::new(REFRESH_CONCURRENCY));
+    // Atomic counter so concurrent tasks can report progress in order
+    let done_counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let refreshed: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let mut handles = Vec::with_capacity(feeds.len());
 
     for feed in feeds {
-        if let Err(e) = refresh_feed_helper(feed.id.clone(), db.inner().clone()).await {
-            eprintln!("Failed to refresh feed {}: {}", feed.id, e);
-        } else {
-            refreshed_feeds.push(feed.id.clone());
-        }
-        done += 1;
-        let _ = app.emit("refresh-progress", RefreshProgress {
-            done,
-            total,
-            feed_title: feed.title.clone(),
+        let sem = sem.clone();
+        let db = db.clone();
+        let app = app.clone();
+        let done_counter = done_counter.clone();
+        let refreshed = refreshed.clone();
+
+        let handle = tokio::spawn(async move {
+            let _permit = sem.acquire().await;
+            let ok = refresh_feed_helper(feed.id.clone(), db).await.is_ok();
+            if !ok {
+                eprintln!("Failed to refresh feed {}", feed.id);
+            }
+            let done = done_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            if ok {
+                refreshed.lock().await.push(feed.id.clone());
+            }
+            let _ = app.emit("refresh-progress", RefreshProgress {
+                done,
+                total,
+                feed_title: feed.title.clone(),
+            });
         });
+        handles.push(handle);
     }
 
-    Ok(refreshed_feeds)
+    for h in handles { let _ = h.await; }
+
+    let result = refreshed.lock().await.clone();
+    Ok(result)
 }
 
 #[tauri::command]
@@ -403,6 +431,31 @@ pub async fn delete_filter_rule(rule_id: String, db: State<'_, DbState>) -> Resu
     let db_guard = db.lock().await;
     db_guard
         .delete_filter_rule(&rule_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+const SETTING_AUTO_REFRESH_INTERVAL: &str = "auto_refresh_interval_minutes";
+
+/// Returns the configured auto-refresh interval in minutes, or 0 if disabled.
+#[tauri::command]
+pub async fn get_auto_refresh_interval(db: State<'_, DbState>) -> Result<u64, String> {
+    let db_guard = db.lock().await;
+    let val = db_guard
+        .get_setting(SETTING_AUTO_REFRESH_INTERVAL)
+        .await
+        .map_err(|e| e.to_string())?
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    Ok(val)
+}
+
+/// Sets the auto-refresh interval (0 = disabled, otherwise minutes between refreshes).
+#[tauri::command]
+pub async fn set_auto_refresh_interval(minutes: u64, db: State<'_, DbState>) -> Result<(), String> {
+    let db_guard = db.lock().await;
+    db_guard
+        .set_setting(SETTING_AUTO_REFRESH_INTERVAL, &minutes.to_string())
         .await
         .map_err(|e| e.to_string())
 }

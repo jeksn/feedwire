@@ -125,4 +125,13 @@ export const feedApi = {
   deleteFilterRule: async (ruleId: string): Promise<void> => {
     return await invoke('delete_filter_rule', { ruleId });
   },
+
+  // Auto-refresh interval (0 = disabled, otherwise minutes)
+  getAutoRefreshInterval: async (): Promise<number> => {
+    return await invoke('get_auto_refresh_interval');
+  },
+
+  setAutoRefreshInterval: async (minutes: number): Promise<void> => {
+    return await invoke('set_auto_refresh_interval', { minutes });
+  },
 };

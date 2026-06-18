@@ -1631,3 +1631,58 @@ body {
   padding: 0 10px;
   font-size: var(--font-size-xs);
 }
+
+/* ── Auto-refresh Setting ── */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+.settings-row-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--macos-text-primary);
+}
+.settings-row-control {
+  display: flex;
+  align-items: center;
+}
+
+.auto-refresh-segment {
+  display: inline-flex;
+  background-color: var(--macos-bg-secondary);
+  border: 1px solid var(--macos-border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+}
+.auto-refresh-btn {
+  display: flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--macos-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.auto-refresh-btn:hover {
+  color: var(--macos-text-primary);
+}
+.auto-refresh-btn.active {
+  background-color: var(--macos-bg-primary);
+  color: var(--macos-text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.auto-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

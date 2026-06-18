@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { emit } from "@tauri-apps/api/event";
+import { useState, useEffect, useRef } from "react";
+import { emit, listen } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/Sidebar";
 import { ArticleList } from "./components/ArticleList";
 import { ContentPane } from "./components/ContentPane";
@@ -23,6 +23,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
+  // Keep a stable ref to the current view/feed so event listeners can read
+  // them without needing to be re-registered on every state change.
+  const selectedViewRef = useRef<View>('feed');
+  const selectedFeedRef = useRef<Feed | null>(null);
+  useEffect(() => { selectedViewRef.current = selectedView; }, [selectedView]);
+  useEffect(() => { selectedFeedRef.current = selectedFeed; }, [selectedFeed]);
+
   // Signal the Rust backend that the React tree has mounted and the window
   // can be made visible. Runs after first paint, so the user never sees a
   // blank frame. Errors are ignored in non-Tauri environments (tests, browser).
@@ -33,6 +40,24 @@ function App() {
   useEffect(() => {
     loadFeeds();
     loadArticles();
+  }, []);
+
+  // When a background or launch refresh finishes, silently reload feeds and
+  // articles so unread counts and article lists stay up to date.
+  useEffect(() => {
+    const unlisten = listen<{ done: number; total: number }>('refresh-progress', e => {
+      const { done, total } = e.payload;
+      if (done === total && total > 0) {
+        loadFeeds();
+        const view = selectedViewRef.current;
+        const feed = selectedFeedRef.current;
+        if (view === 'unread') loadUnread();
+        else if (view === 'bookmarks') loadBookmarks();
+        else loadArticles(feed?.id);
+      }
+    });
+    return () => { unlisten.then(fn => fn()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadFeeds = async () => {

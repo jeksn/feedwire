@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp, Trash2, Plus, X } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp, Trash2, Plus, X, RefreshCw } from 'lucide-react';
 import type { ThemePreference } from '../hooks/useTheme';
 import type { ImportResult } from '../api/feed';
 import { feedApi } from '../api/feed';
@@ -112,6 +112,9 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
             </button>
           </div>
         </section>
+
+        {/* Auto-refresh section */}
+        <AutoRefreshSection />
 
         {/* Import / Export section */}
         <section className="settings-section">
@@ -325,6 +328,74 @@ function ExportStatusBadge({ status }: { status: ExportStatus }) {
       <AlertCircle size={13} />
       <span>{status.message}</span>
     </div>
+  );
+}
+
+// ── Auto-refresh Section ──────────────────────────────────────────────────────
+
+const INTERVAL_OPTIONS: { label: string; value: number }[] = [
+  { label: 'Off',        value: 0   },
+  { label: 'Every 30 min', value: 30  },
+  { label: 'Every hour',   value: 60  },
+  { label: 'Every 2 hours', value: 120 },
+];
+
+function AutoRefreshSection() {
+  const [interval, setInterval] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    feedApi.getAutoRefreshInterval()
+      .then(v => setInterval(v))
+      .catch(console.error);
+  }, []);
+
+  const handleChange = async (minutes: number) => {
+    setInterval(minutes);
+    setSaving(true);
+    try {
+      await feedApi.setAutoRefreshInterval(minutes);
+    } catch (e) {
+      console.error('Failed to save auto-refresh interval', e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="settings-section">
+      <h3 className="settings-section-title">Refresh</h3>
+      <p className="settings-section-description">
+        Feeds are refreshed automatically on launch. You can also set a
+        background refresh interval so new articles appear while the app
+        is open.
+      </p>
+
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <RefreshCw size={14} className="text-accent" />
+          <span>Background refresh</span>
+        </div>
+        <div className="settings-row-control">
+          {interval === null ? (
+            <Loader size={13} className="animate-spin" />
+          ) : (
+            <div className="auto-refresh-segment">
+              {INTERVAL_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  className={`auto-refresh-btn${interval === opt.value ? ' active' : ''}`}
+                  onClick={() => handleChange(opt.value)}
+                  disabled={saving}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 

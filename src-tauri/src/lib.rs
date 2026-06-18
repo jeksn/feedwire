@@ -4,7 +4,7 @@
 mod db;
 mod opml;
 
-use db::{Database, commands::DbState};
+use db::{Database, commands::{DbState, refresh_all_feeds_inner}};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tauri::{Listener, Manager};
@@ -60,10 +60,68 @@ pub fn run() {
                     let _ = window_for_timer.set_focus();
                 });
 
-                // Primary: show as soon as frontend signals it's ready
+                // Primary: show as soon as frontend signals it's ready, then
+                // kick off a silent background refresh so the user sees fresh
+                // content immediately on launch (same behaviour as NetNewsWire).
+                let db_for_launch = app.state::<DbState>().inner().clone();
+                let app_for_launch = app.handle().clone();
                 window.listen("app-ready", move |_| {
                     let _ = window_for_event.show();
                     let _ = window_for_event.set_focus();
+                    // Silent launch refresh — errors are non-fatal
+                    let db = db_for_launch.clone();
+                    let app = app_for_launch.clone();
+                    tauri::async_runtime::spawn(async move {
+                        // Small delay so the UI has time to finish rendering
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                        if let Err(e) = refresh_all_feeds_inner(app, db).await {
+                            eprintln!("Launch refresh failed: {}", e);
+                        }
+                    });
+                });
+            }
+
+            // Background periodic refresh timer.
+            // Reads the interval from the DB every tick so changes in Settings
+            // take effect without restarting the app.
+            {
+                let db_for_timer = app.state::<DbState>().inner().clone();
+                let app_for_timer = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Check every 60 s whether a refresh is due.
+                    let tick = std::time::Duration::from_secs(60);
+                    let mut last_refresh = std::time::Instant::now();
+
+                    loop {
+                        tokio::time::sleep(tick).await;
+
+                        // Read current interval setting
+                        let interval_minutes: u64 = {
+                            let guard = db_for_timer.lock().await;
+                            guard
+                                .get_setting("auto_refresh_interval_minutes")
+                                .await
+                                .ok()
+                                .flatten()
+                                .and_then(|v| v.parse().ok())
+                                .unwrap_or(0)
+                        };
+
+                        if interval_minutes == 0 {
+                            // Disabled — reset the clock so we don't fire
+                            // immediately when the user re-enables it.
+                            last_refresh = std::time::Instant::now();
+                            continue;
+                        }
+
+                        let elapsed = last_refresh.elapsed();
+                        if elapsed >= std::time::Duration::from_secs(interval_minutes * 60) {
+                            last_refresh = std::time::Instant::now();
+                            if let Err(e) = refresh_all_feeds_inner(app_for_timer.clone(), db_for_timer.clone()).await {
+                                eprintln!("Background refresh failed: {}", e);
+                            }
+                        }
+                    }
                 });
             }
 
@@ -96,6 +154,8 @@ pub fn run() {
             db::commands::add_filter_rule,
             db::commands::update_filter_rule_enabled,
             db::commands::delete_filter_rule,
+            db::commands::get_auto_refresh_interval,
+            db::commands::set_auto_refresh_interval,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
