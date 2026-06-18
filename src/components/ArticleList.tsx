@@ -38,9 +38,6 @@ export function ArticleList({
     return map;
   }, [feeds]);
 
-  // Show source feed badge when viewing across multiple feeds
-  const showFeedBadge = !selectedFeed;
-
   // Scroll the active article row into view whenever selection changes
   useEffect(() => {
     if (!selectedArticle || !listRef.current) return;
@@ -146,12 +143,6 @@ export function ArticleList({
               onClick={() => onArticleSelect(article)}
             >
               <div className="article-header">
-                {showFeedBadge && feedTitleById[article.feed_id] && (
-                  <div className="article-feed-badge">
-                    {feedTitleById[article.feed_id]}
-                  </div>
-                )}
-
                 <div className="article-title">
                   {article.title}
                 </div>
@@ -160,9 +151,9 @@ export function ArticleList({
                   <span className="text-xs">
                     {formatDate(article.published_at)}
                   </span>
-                  {article.author && (
+                  {feedTitleById[article.feed_id] && (
                     <span className="text-xs">
-                      • {article.author}
+                      • {feedTitleById[article.feed_id]}
                     </span>
                   )}
                   {article.link && (
