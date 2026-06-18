@@ -84,6 +84,7 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
         <h2 className="settings-title">Settings</h2>
       </div>
 
+      <div className="settings-scroll">
       <div className="settings-body">
         {/* Appearance section */}
         <section className="settings-section">
@@ -244,6 +245,7 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
             <p className="text-xs text-secondary" style={{ marginTop: 4 }}>Version 0.1.0</p>
           </div>
         </section>
+      </div>
       </div>
     </div>
   );

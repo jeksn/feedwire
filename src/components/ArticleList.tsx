@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { RefreshCw, ExternalLink, CheckCheck, Trash2 } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
@@ -25,6 +26,15 @@ export function ArticleList({
   onMarkAllRead,
   onDeleteFeed
 }: ArticleListProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Scroll the active article row into view whenever selection changes
+  useEffect(() => {
+    if (!selectedArticle || !listRef.current) return;
+    const el = listRef.current.querySelector<HTMLElement>(`[data-article-id="${selectedArticle.id}"]`);
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedArticle]);
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     
@@ -97,7 +107,7 @@ export function ArticleList({
         </div>
       </div>
 
-      <div className="list">
+      <div className="list" ref={listRef}>
         {loading ? (
           <div className="loading">
             <div className="spinner"></div>
@@ -118,6 +128,7 @@ export function ArticleList({
           articles.map(article => (
             <div
               key={article.id}
+              data-article-id={article.id}
               className={`article-item ${selectedArticle?.id === article.id ? 'active' : ''} ${!article.is_read ? 'unread' : 'read'}`}
               onClick={() => onArticleSelect(article)}
             >

@@ -23,12 +23,16 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
-  // Keep a stable ref to the current view/feed so event listeners can read
-  // them without needing to be re-registered on every state change.
+  // Keep stable refs so event listeners can read current state without
+  // needing to be re-registered on every render.
   const selectedViewRef = useRef<View>('feed');
   const selectedFeedRef = useRef<Feed | null>(null);
+  const selectedArticleRef = useRef<Article | null>(null);
+  const articlesRef = useRef<Article[]>([]);
   useEffect(() => { selectedViewRef.current = selectedView; }, [selectedView]);
   useEffect(() => { selectedFeedRef.current = selectedFeed; }, [selectedFeed]);
+  useEffect(() => { selectedArticleRef.current = selectedArticle; }, [selectedArticle]);
+  useEffect(() => { articlesRef.current = articles; }, [articles]);
 
   // Signal the Rust backend that the React tree has mounted and the window
   // can be made visible. Runs after first paint, so the user never sees a
@@ -57,6 +61,51 @@ function App() {
       }
     });
     return () => { unlisten.then(fn => fn()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore when typing in an input / textarea / contenteditable
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return;
+
+      // Cmd+, → Settings
+      if (e.key === ',' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSelectedFeed(null);
+        setSelectedArticle(null);
+        setSelectedView('settings');
+        return;
+      }
+
+      // s → Bookmark / unbookmark selected article
+      if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const article = selectedArticleRef.current;
+        if (article) {
+          e.preventDefault();
+          handleToggleBookmark(article.id);
+        }
+        return;
+      }
+
+      // Arrow up / down → navigate articles
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const list = articlesRef.current;
+        if (list.length === 0) return;
+        e.preventDefault();
+        const current = selectedArticleRef.current;
+        const idx = current ? list.findIndex(a => a.id === current.id) : -1;
+        const next = e.key === 'ArrowDown'
+          ? Math.min(idx + 1, list.length - 1)
+          : Math.max(idx - 1, 0);
+        if (next !== idx) handleArticleSelect(list[next]);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

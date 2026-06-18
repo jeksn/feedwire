@@ -340,11 +340,6 @@ body {
   background-color: var(--macos-bg-secondary);
 }
 
-.article-item.active {
-  background-color: var(--macos-accent);
-  color: white;
-}
-
 .article-item.unread {
   background-color: var(--macos-bg-primary);
 }
@@ -352,6 +347,11 @@ body {
 .article-item.read {
   background-color: var(--macos-bg-secondary);
   opacity: 0.8;
+}
+
+.article-item.active {
+  background-color: color-mix(in srgb, var(--macos-accent) 15%, var(--macos-bg-primary));
+  opacity: 1;
 }
 
 .article-header {
@@ -1131,7 +1131,17 @@ body {
   background-color: var(--macos-bg-secondary);
 }
 
+/* Full-width scroll container — scrollbar sits at the far right edge */
+.settings-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .settings-header {
+  width: 100%;
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid var(--macos-border);
   background-color: var(--macos-bg-primary);
@@ -1148,12 +1158,13 @@ body {
 
 .settings-body {
   flex: 1;
-  overflow-y: auto;
   padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xl);
-  max-width: 640px;
+  max-width: 680px;
+  width: 100%;
+  align-self: center;
 }
 
 .settings-section {
