@@ -444,6 +444,71 @@ body {
   color: var(--macos-text-primary);
 }
 
+/* YouTube video card */
+.yt-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--macos-border-light);
+  background: var(--macos-bg-secondary);
+  max-width: 560px;
+}
+
+.yt-thumbnail-wrap {
+  position: relative;
+  cursor: pointer;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+
+.yt-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.2s;
+}
+
+.yt-thumbnail-wrap:hover .yt-thumbnail {
+  opacity: 0.85;
+}
+
+.yt-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.yt-thumbnail-wrap:hover .yt-play-overlay {
+  opacity: 1;
+}
+
+.yt-card-body {
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.yt-card-hint {
+  font-size: var(--font-size-sm);
+  color: var(--macos-text-secondary);
+  flex: 1;
+}
+
+.yt-watch-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Utility Classes */
 .truncate {
   white-space: nowrap;

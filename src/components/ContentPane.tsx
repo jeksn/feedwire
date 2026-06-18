@@ -1,4 +1,4 @@
-import { Bookmark, BookmarkCheck, ExternalLink, Calendar, Rss } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ExternalLink, Calendar, Rss, Play } from 'lucide-react';
 import { openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
 import type { Article, Feed } from '../types';
 
@@ -12,10 +12,24 @@ function openUrl(url: string) {
   tauriOpenUrl(url).catch(console.error);
 }
 
+/** Extract the first <img src> from an HTML string, or null. */
+function extractFirstImage(html: string): string | null {
+  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return m ? m[1] : null;
+}
+
 export function ContentPane({ article, feeds, onToggleBookmark }: ContentPaneProps) {
-  const feedName = article
-    ? (feeds?.find(f => f.id === article.feed_id)?.title ?? null)
-    : null;
+  const feed = article ? (feeds?.find(f => f.id === article.feed_id) ?? null) : null;
+  const feedName = feed?.title ?? null;
+
+  // YouTube articles have no content body — detect by youtube.com link
+  const isYouTube = !!(article?.link?.includes('youtube.com') || article?.link?.includes('youtu.be'));
+  const bodyHtml = article ? (article.content || article.description || '') : '';
+  const hasBody = bodyHtml.trim().length > 0 && !isYouTube;
+
+  // Pull thumbnail from description HTML if present (YouTube includes it)
+  const thumbnail = isYouTube && bodyHtml ? extractFirstImage(bodyHtml) : null;
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -54,8 +68,10 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
     );
   }
 
-  const bodyHtml = article.content || article.description || '';
   const hasHtml = /<[a-z][\s\S]*>/i.test(bodyHtml);
+
+  // Only show author if it's different from the feed name (avoids duplication)
+  const showAuthor = article.author && article.author !== feedName;
 
   return (
     <div className="content-pane">
@@ -101,7 +117,7 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
               <span>{formatDate(article.published_at)}</span>
             </div>
           )}
-          {article.author && (
+          {showAuthor && (
             <div className="flex items-center gap-xs" style={{ color: 'var(--macos-text-tertiary)' }}>
               <span>{article.author}</span>
             </div>
@@ -110,18 +126,46 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
       </div>
 
       <div className="content-body" onClick={handleContentClick}>
-        {bodyHtml ? (
+        {isYouTube ? (
+          <div className="yt-card">
+            {thumbnail && (
+              <div className="yt-thumbnail-wrap" onClick={() => article.link && openUrl(article.link)}>
+                <img className="yt-thumbnail" src={thumbnail} alt="" />
+                <div className="yt-play-overlay">
+                  <Play size={48} fill="white" stroke="none" />
+                </div>
+              </div>
+            )}
+            <div className="yt-card-body">
+              <p className="yt-card-hint">YouTube videos can't be played inline.</p>
+              {article.link && (
+                <button className="btn btn-primary yt-watch-btn" onClick={() => openUrl(article.link!)}>
+                  <Play size={16} />
+                  Watch on YouTube
+                </button>
+              )}
+            </div>
+          </div>
+        ) : hasBody ? (
           hasHtml ? (
             <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
           ) : (
-            // Plain text — preserve line breaks
             <p style={{ whiteSpace: 'pre-wrap' }}>{bodyHtml}</p>
           )
         ) : (
-          <div className="text-secondary">No content available for this article.</div>
+          <>
+            <div className="text-secondary">No content available for this article.</div>
+            {article.link && (
+              <div className="mt-lg">
+                <button className="btn btn-primary" onClick={() => openUrl(article.link!)}>
+                  Read Original Article
+                </button>
+              </div>
+            )}
+          </>
         )}
 
-        {article.link && (
+        {hasBody && article.link && (
           <div className="mt-lg">
             <button className="btn btn-primary" onClick={() => openUrl(article.link!)}>
               Read Original Article
