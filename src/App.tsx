@@ -29,6 +29,11 @@ function App() {
   const selectedFeedRef = useRef<Feed | null>(null);
   const selectedArticleRef = useRef<Article | null>(null);
   const articlesRef = useRef<Article[]>([]);
+  // Ref to the latest handleToggleBookmark / handleArticleSelect so the
+  // keyboard shortcut effect (registered once with [] deps) always calls
+  // the current version without needing to re-register.
+  const toggleBookmarkRef = useRef<(id: string) => Promise<void>>(async () => {});
+  const articleSelectRef = useRef<(a: Article) => Promise<void>>(async () => {});
   useEffect(() => { selectedViewRef.current = selectedView; }, [selectedView]);
   useEffect(() => { selectedFeedRef.current = selectedFeed; }, [selectedFeed]);
   useEffect(() => { selectedArticleRef.current = selectedArticle; }, [selectedArticle]);
@@ -85,7 +90,7 @@ function App() {
         const article = selectedArticleRef.current;
         if (article) {
           e.preventDefault();
-          handleToggleBookmark(article.id);
+          toggleBookmarkRef.current(article.id);
         }
         return;
       }
@@ -100,7 +105,7 @@ function App() {
         const next = e.key === 'ArrowDown'
           ? Math.min(idx + 1, list.length - 1)
           : Math.max(idx - 1, 0);
-        if (next !== idx) handleArticleSelect(list[next]);
+        if (next !== idx) articleSelectRef.current(list[next]);
       }
     };
 
@@ -328,14 +333,15 @@ function App() {
       const updatedArticle = await feedApi.toggleBookmark(articleId);
       setArticles(prev => {
         // In bookmarks view, remove article if it's been unbookmarked
-        if (selectedView === 'bookmarks' && !updatedArticle.is_bookmarked) {
+        if (selectedViewRef.current === 'bookmarks' && !updatedArticle.is_bookmarked) {
           return prev.filter(a => a.id !== articleId);
         }
         return prev.map(a => a.id === articleId ? updatedArticle : a);
       });
-      if (selectedArticle?.id === articleId) {
-        // If unbookmarked while in bookmarks view, deselect
-        if (selectedView === 'bookmarks' && !updatedArticle.is_bookmarked) {
+      // Use ref for comparison so this works whether called from the button
+      // or from the keyboard shortcut (stale closure safe)
+      if (selectedArticleRef.current?.id === articleId) {
+        if (selectedViewRef.current === 'bookmarks' && !updatedArticle.is_bookmarked) {
           setSelectedArticle(null);
         } else {
           setSelectedArticle(updatedArticle);
@@ -345,6 +351,11 @@ function App() {
       console.error("Failed to toggle bookmark:", error);
     }
   };
+
+  // Keep function refs current so the keyboard shortcut handler (registered
+  // once with [] deps) always calls the latest version of these functions.
+  toggleBookmarkRef.current = handleToggleBookmark;
+  articleSelectRef.current = handleArticleSelect;
 
   const articleListTitle = selectedView === 'bookmarks' ? 'Bookmarks'
     : selectedView === 'unread' ? 'Unread' : undefined;
