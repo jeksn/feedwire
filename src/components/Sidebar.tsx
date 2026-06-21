@@ -783,7 +783,7 @@ const FeedContextMenu = ({
         </form>
       ) : confirmingDelete ? (
         <>
-          <div className="context-menu-label">Delete "{feed.title}"?</div>
+          <div className="context-menu-label">Delete feed?</div>
           <div className="context-menu-delete-hint">This feed and its articles will be removed.</div>
           <button className="context-menu-item context-menu-item--remove" onClick={handleDelete}>
             <Trash2 size={12} />
@@ -795,8 +795,6 @@ const FeedContextMenu = ({
         </>
       ) : (
         <>
-          <div className="context-menu-label">{feed.title}</div>
-
           <button
             className="context-menu-item"
             onClick={() => { onMarkAllRead(feed.id); onClose(); }}
