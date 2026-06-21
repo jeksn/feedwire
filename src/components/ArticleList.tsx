@@ -246,8 +246,6 @@ const ArticleContextMenu = ({
       style={{ position: 'fixed', ...style }}
       onMouseDown={e => e.stopPropagation()}
     >
-      <div className="context-menu-label">{article.title}</div>
-
       {onMarkArticleRead && (
         <button
           className="context-menu-item"
