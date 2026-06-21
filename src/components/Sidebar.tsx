@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus, RefreshCw, Rss, Bookmark, Inbox, Settings,
   ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X, Eye,
+  CheckCheck, Trash2, Link2,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import type { Feed, Folder } from '../types';
@@ -127,6 +128,10 @@ interface SidebarProps {
   onAddFeed: () => void;
   onRefreshAll: () => void;
   onFeedsChanged: () => void; // called after folder assignment so App re-fetches
+  onMarkFeedAllRead: (feedId: string) => void;
+  onRefreshFeed: (feedId: string) => void;
+  onCopyUrl: (url: string) => void;
+  onDeleteFeed: (feedId: string) => void;
   loading: boolean;
 }
 
@@ -143,6 +148,10 @@ export function Sidebar({
   onAddFeed,
   onRefreshAll,
   onFeedsChanged,
+  onMarkFeedAllRead,
+  onRefreshFeed,
+  onCopyUrl,
+  onDeleteFeed,
   loading,
 }: SidebarProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>(loadSortOrder);
@@ -553,14 +562,17 @@ export function Sidebar({
       {contextMenu && (
         <FeedContextMenu
           ref={contextMenuRef}
-          feedId={contextMenu.feedId}
+          feed={feeds.find(f => f.id === contextMenu.feedId)!}
           x={contextMenu.x}
           y={contextMenu.y}
           folders={folders}
-          currentFolderId={feeds.find(f => f.id === contextMenu.feedId)?.folder_id ?? null}
           onClose={() => setContextMenu(null)}
           onFolderCreated={folder => setFolders(prev => [...prev, folder])}
           onFeedsChanged={onFeedsChanged}
+          onMarkAllRead={onMarkFeedAllRead}
+          onRefresh={onRefreshFeed}
+          onCopyUrl={onCopyUrl}
+          onDelete={onDeleteFeed}
         />
       )}
 
@@ -673,23 +685,29 @@ function FeedRow({ feed, isActive, unreadCount, onSelect, onContextMenu, indente
 // ── FeedContextMenu ──────────────────────────────────────────────────────────
 
 interface FeedContextMenuProps {
-  feedId: string;
+  feed: Feed;
   x: number;
   y: number;
   folders: Folder[];
-  currentFolderId: string | null | undefined;
   onClose: () => void;
   onFolderCreated: (folder: Folder) => void;
   onFeedsChanged: () => void;
+  onMarkAllRead: (feedId: string) => void;
+  onRefresh: (feedId: string) => void;
+  onCopyUrl: (url: string) => void;
+  onDelete: (feedId: string) => void;
 }
 
 const FeedContextMenu = ({
-  feedId, x, y, folders, currentFolderId, onClose, onFolderCreated, onFeedsChanged,
+  feed, x, y, folders, onClose, onFolderCreated, onFeedsChanged, onMarkAllRead,
+  onRefresh, onCopyUrl, onDelete,
 }: FeedContextMenuProps & { ref?: React.Ref<HTMLDivElement> }) => {
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const currentFolderId = feed.folder_id;
 
   // Auto-focus new folder input
   useEffect(() => {
@@ -699,15 +717,15 @@ const FeedContextMenu = ({
   // Clamp position so menu doesn't overflow viewport
   const style = useMemo(() => {
     const menuW = 200;
-    const menuH = creatingFolder ? 140 : Math.min(40 + folders.length * 32 + 64, 320);
+    const menuH = creatingFolder ? 140 : confirmingDelete ? 120 : 190;
     const left = Math.min(x, window.innerWidth - menuW - 8);
     const top  = Math.min(y, window.innerHeight - menuH - 8);
     return { left, top };
-  }, [x, y, folders.length, creatingFolder]);
+  }, [x, y, folders.length, creatingFolder, confirmingDelete]);
 
   const assign = async (folderId: string | null) => {
     try {
-      await feedApi.setFeedFolder(feedId, folderId);
+      await feedApi.setFeedFolder(feed.id, folderId);
       onFeedsChanged();
     } catch (e) {
       console.error('Failed to assign folder', e);
@@ -722,11 +740,16 @@ const FeedContextMenu = ({
     try {
       const folder = await feedApi.createFolder(name);
       onFolderCreated(folder);
-      await feedApi.setFeedFolder(feedId, folder.id);
+      await feedApi.setFeedFolder(feed.id, folder.id);
       onFeedsChanged();
     } catch (e) {
       console.error('Failed to create folder', e);
     }
+    onClose();
+  };
+
+  const handleDelete = () => {
+    onDelete(feed.id);
     onClose();
   };
 
@@ -737,8 +760,6 @@ const FeedContextMenu = ({
       style={{ position: 'fixed', ...style }}
       onMouseDown={e => e.stopPropagation()} // prevent outside-click handler from firing
     >
-      <div className="context-menu-label">Move to folder</div>
-
       {creatingFolder ? (
         <form className="context-menu-new-folder" onSubmit={handleNewFolder}>
           <input
@@ -760,8 +781,49 @@ const FeedContextMenu = ({
             Cancel
           </button>
         </form>
+      ) : confirmingDelete ? (
+        <>
+          <div className="context-menu-label">Delete "{feed.title}"?</div>
+          <div className="context-menu-delete-hint">This feed and its articles will be removed.</div>
+          <button className="context-menu-item context-menu-item--remove" onClick={handleDelete}>
+            <Trash2 size={12} />
+            Delete feed
+          </button>
+          <button className="context-menu-item context-menu-item--cancel" onClick={onClose}>
+            Cancel
+          </button>
+        </>
       ) : (
         <>
+          <div className="context-menu-label">{feed.title}</div>
+
+          <button
+            className="context-menu-item"
+            onClick={() => { onMarkAllRead(feed.id); onClose(); }}
+          >
+            <CheckCheck size={12} />
+            Mark all as read
+          </button>
+
+          <button
+            className="context-menu-item"
+            onClick={() => { onRefresh(feed.id); onClose(); }}
+          >
+            <RefreshCw size={12} />
+            Refresh feed
+          </button>
+
+          <button
+            className="context-menu-item"
+            onClick={() => { onCopyUrl(feed.url); onClose(); }}
+          >
+            <Link2 size={12} />
+            Copy feed URL
+          </button>
+
+          <div className="context-menu-divider" />
+          <div className="context-menu-label">Move to folder</div>
+
           {folders.map(folder => (
             <button
               key={folder.id}
@@ -787,6 +849,15 @@ const FeedContextMenu = ({
           <button className="context-menu-item" onClick={() => setCreatingFolder(true)}>
             <Plus size={12} />
             New folder…
+          </button>
+
+          <div className="context-menu-divider" />
+          <button
+            className="context-menu-item context-menu-item--remove"
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <Trash2 size={12} />
+            Delete feed
           </button>
         </>
       )}

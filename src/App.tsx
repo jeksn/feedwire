@@ -250,6 +250,27 @@ function App() {
     }
   };
 
+  const handleMarkArticleRead = async (articleId: string, isRead: boolean) => {
+    try {
+      const updatedArticle = await feedApi.markArticleRead(articleId, isRead);
+      setArticles(prev => prev.map(a => a.id === articleId ? updatedArticle : a));
+      if (selectedArticle?.id === articleId) {
+        setSelectedArticle(updatedArticle);
+      }
+      // Adjust unread count for the article's feed
+      const feedId = updatedArticle.feed_id;
+      setUnreadCounts(prev => {
+        const current = prev[feedId] ?? 0;
+        return {
+          ...prev,
+          [feedId]: Math.max(0, isRead ? current - 1 : current + 1)
+        };
+      });
+    } catch (error) {
+      console.error("Failed to mark article:", error);
+    }
+  };
+
   const handleAddFeed = async (url: string) => {
     try {
       setLoading(true);
@@ -339,6 +360,27 @@ function App() {
     }
   };
 
+  const handleMarkFeedAllRead = async (feedId: string) => {
+    try {
+      await feedApi.markAllRead(feedId);
+      setUnreadCounts(prev => ({ ...prev, [feedId]: 0 }));
+      // If the feed is currently selected, refresh the article list
+      if (selectedFeed?.id === feedId) {
+        setArticles(prev => prev.map(a => ({ ...a, is_read: true })));
+      }
+    } catch (error) {
+      console.error("Failed to mark feed as read:", error);
+    }
+  };
+
+  const handleCopyUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (error) {
+      console.error("Failed to copy URL:", error);
+    }
+  };
+
   const handleToggleBookmark = async (articleId: string) => {
     try {
       const updatedArticle = await feedApi.toggleBookmark(articleId);
@@ -388,6 +430,10 @@ function App() {
         onRefreshAll={handleRefreshAll}
         onFeedsChanged={loadFeeds}
         bookmarkCount={bookmarkCount}
+        onMarkFeedAllRead={handleMarkFeedAllRead}
+        onRefreshFeed={handleRefreshFeed}
+        onCopyUrl={handleCopyUrl}
+        onDeleteFeed={handleDeleteFeed}
         loading={loading}
       />
 
@@ -413,6 +459,9 @@ function App() {
             onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
             onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
             onDeleteFeed={selectedView === 'feed' && selectedFeed ? () => handleDeleteFeed(selectedFeed.id) : undefined}
+            onMarkArticleRead={handleMarkArticleRead}
+            onToggleBookmark={handleToggleBookmark}
+            onCopyUrl={handleCopyUrl}
           />
 
           <ContentPane

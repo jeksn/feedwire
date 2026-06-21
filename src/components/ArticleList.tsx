@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { RefreshCw, CheckCheck, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw, CheckCheck, Trash2, Bookmark, BookmarkCheck, Link2, ExternalLink, Circle, CheckCircle2 } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
 
 interface ArticleListProps {
@@ -14,6 +15,9 @@ interface ArticleListProps {
   onRefreshFeed: () => void;
   onMarkAllRead?: () => void;
   onDeleteFeed?: () => void;
+  onMarkArticleRead?: (articleId: string, isRead: boolean) => void;
+  onToggleBookmark?: (articleId: string) => void;
+  onCopyUrl?: (url: string) => void;
 }
 
 export function ArticleList({
@@ -26,9 +30,13 @@ export function ArticleList({
   title,
   onRefreshFeed,
   onMarkAllRead,
-  onDeleteFeed
+  onDeleteFeed,
+  onMarkArticleRead,
+  onToggleBookmark,
+  onCopyUrl
 }: ArticleListProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const [contextMenu, setContextMenu] = useState<{ article: Article; x: number; y: number } | null>(null);
 
   // Build a fast id→title lookup. Only computed when feeds changes.
   const feedTitleById = useMemo(() => {
@@ -43,6 +51,24 @@ export function ArticleList({
     const el = listRef.current.querySelector<HTMLElement>(`[data-article-id="${selectedArticle.id}"]`);
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selectedArticle]);
+
+  // Close article context menu on outside click or scroll
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('scroll', close, true);
+    };
+  }, [contextMenu]);
+
+  const handleContextMenu = (e: React.MouseEvent, article: Article) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ article, x: e.clientX, y: e.clientY });
+  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
@@ -140,6 +166,7 @@ export function ArticleList({
               data-article-id={article.id}
               className={`article-item ${selectedArticle?.id === article.id ? 'active' : ''} ${!article.is_read ? 'unread' : 'read'}`}
               onClick={() => onArticleSelect(article)}
+              onContextMenu={e => handleContextMenu(e, article)}
             >
               <div className="article-header">
                 <div className="article-title">
@@ -170,6 +197,96 @@ export function ArticleList({
           ))
         )}
       </div>
+
+      {contextMenu && (
+        <ArticleContextMenu
+          article={contextMenu.article}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onMarkArticleRead={onMarkArticleRead}
+          onToggleBookmark={onToggleBookmark}
+          onCopyUrl={onCopyUrl}
+        />
+      )}
     </div>
   );
 }
+
+interface ArticleContextMenuProps {
+  article: Article;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onMarkArticleRead?: (articleId: string, isRead: boolean) => void;
+  onToggleBookmark?: (articleId: string) => void;
+  onCopyUrl?: (url: string) => void;
+}
+
+const ArticleContextMenu = ({
+  article,
+  x,
+  y,
+  onClose,
+  onMarkArticleRead,
+  onToggleBookmark,
+  onCopyUrl,
+}: ArticleContextMenuProps) => {
+  const style = useMemo(() => {
+    const menuW = 180;
+    const menuH = 140;
+    const left = Math.min(x, window.innerWidth - menuW - 8);
+    const top = Math.min(y, window.innerHeight - menuH - 8);
+    return { left, top };
+  }, [x, y]);
+
+  return (
+    <div
+      className="context-menu"
+      style={{ position: 'fixed', ...style }}
+      onMouseDown={e => e.stopPropagation()}
+    >
+      <div className="context-menu-label">{article.title}</div>
+
+      {onMarkArticleRead && (
+        <button
+          className="context-menu-item"
+          onClick={() => { onMarkArticleRead(article.id, !article.is_read); onClose(); }}
+        >
+          {article.is_read ? <Circle size={12} /> : <CheckCircle2 size={12} />}
+          {article.is_read ? 'Mark as unread' : 'Mark as read'}
+        </button>
+      )}
+
+      {onToggleBookmark && (
+        <button
+          className="context-menu-item"
+          onClick={() => { onToggleBookmark(article.id); onClose(); }}
+        >
+          {article.is_bookmarked ? <BookmarkCheck size={12} /> : <Bookmark size={12} />}
+          {article.is_bookmarked ? 'Remove bookmark' : 'Bookmark article'}
+        </button>
+      )}
+
+      {article.link && (
+        <>
+          <button
+            className="context-menu-item"
+            onClick={() => { onCopyUrl?.(article.link!); onClose(); }}
+          >
+            <Link2 size={12} />
+            Copy link
+          </button>
+
+          <button
+            className="context-menu-item"
+            onClick={() => { openUrl(article.link!).catch(console.error); onClose(); }}
+          >
+            <ExternalLink size={12} />
+            Open in browser
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
