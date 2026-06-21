@@ -467,6 +467,13 @@ impl Database {
         Ok(articles)
     }
 
+    pub async fn get_bookmark_count(&self) -> Result<i64, DatabaseError> {
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM articles WHERE is_bookmarked = 1")
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(count)
+    }
+
     pub async fn mark_all_read(&self, feed_id: Option<&str>) -> Result<(), DatabaseError> {
         match feed_id {
             Some(id) => {

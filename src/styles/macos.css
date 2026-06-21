@@ -212,6 +212,25 @@ body {
   border-top: 1px solid var(--macos-border);
 }
 
+.content-status-bar {
+  align-self: flex-start;
+  flex-shrink: 0;
+  max-width: 100%;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--spacing-md);
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-secondary);
+  background: var(--macos-bg-secondary);
+  border-top: 1px solid var(--macos-border);
+  border-top-right-radius: var(--radius-md);
+  z-index: 50;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sidebar {
   width: 280px;
   background-color: var(--macos-sidebar-bg);
@@ -397,6 +416,16 @@ body {
   color: var(--macos-text-primary);
   margin-bottom: var(--spacing-sm);
   line-height: 1.3;
+}
+
+.content-title-link {
+  color: var(--macos-text-primary);
+  text-decoration: none;
+}
+
+.content-title-link:hover {
+  color: var(--macos-accent);
+  text-decoration: underline;
 }
 
 .content-meta {
@@ -1095,10 +1124,38 @@ body {
   background: var(--macos-bg-secondary);
 }
 
-.sidebar-view-option input[type="checkbox"] {
+.sidebar-view-option input[type="checkbox"],
+.sidebar-view-option input[type="radio"] {
   margin: 0;
   cursor: pointer;
   accent-color: var(--macos-accent);
+}
+
+.sidebar-view-section {
+  padding: 4px 12px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--macos-text-tertiary);
+  border-top: 1px solid var(--macos-border-light);
+  margin-top: 4px;
+}
+
+.sidebar-view-section:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+
+.feed-count-subtle {
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  padding: 1px 5px;
+}
+
+.list-item.active .feed-count-subtle {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* ── Feed avatar ── */

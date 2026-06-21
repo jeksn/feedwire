@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bookmark, BookmarkCheck, ExternalLink, Calendar, Rss, Play } from 'lucide-react';
 import { openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
 import type { Article, Feed } from '../types';
@@ -12,6 +13,21 @@ function openUrl(url: string) {
   tauriOpenUrl(url).catch(console.error);
 }
 
+/** Tiny YouTube logo SVG (lucide-react version doesn't include it). */
+function YouTubeIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M23.498 6.186a2.996 2.996 0 0 0-2.116-2.116C19.724 3.5 12 3.5 12 3.5s-7.724 0-9.382.57A2.996 2.996 0 0 0 .502 6.186C0 7.844 0 12 0 12s0 4.156.502 5.814a2.996 2.996 0 0 0 2.116 2.116c1.658.57 9.382.57 9.382.57s7.724 0 9.382-.57a2.996 2.996 0 0 0 2.116-2.116C24 16.156 24 12 24 12s0-4.156-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+    </svg>
+  );
+}
+
 /** Extract the first <img src> from an HTML string, or null. */
 function extractFirstImage(html: string): string | null {
   const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
@@ -19,11 +35,12 @@ function extractFirstImage(html: string): string | null {
 }
 
 export function ContentPane({ article, feeds, onToggleBookmark }: ContentPaneProps) {
+  const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+
   const feed = article ? (feeds?.find(f => f.id === article.feed_id) ?? null) : null;
   const feedName = feed?.title ?? null;
+  const isYouTube = !!(feed?.url?.includes('youtube.com') || feed?.url?.includes('youtu.be'));
 
-  // YouTube articles have no content body — detect by youtube.com link
-  const isYouTube = !!(article?.link?.includes('youtube.com') || article?.link?.includes('youtu.be'));
   const bodyHtml = article ? (article.content || article.description || '') : '';
   const hasBody = bodyHtml.trim().length > 0 && !isYouTube;
 
@@ -70,14 +87,40 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
 
   const hasHtml = /<[a-z][\s\S]*>/i.test(bodyHtml);
 
-  // Only show author if it's different from the feed name (avoids duplication)
-  const showAuthor = article.author && article.author !== feedName;
+  // Suppress the author when it's just the channel name (case-insensitive)
+  const showAuthor = article.author &&
+    article.author.trim().toLowerCase() !== (feedName ?? '').trim().toLowerCase();
 
   return (
-    <div className="content-pane">
+    <div
+      className="content-pane"
+      onMouseOver={(e) => {
+        const anchor = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href]');
+        if (anchor?.href) setHoveredLink(anchor.href);
+      }}
+      onMouseOut={(e) => {
+        const anchor = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href]');
+        if (anchor) setHoveredLink(null);
+      }}
+    >
       <div className="content-header">
         <div className="flex items-start justify-between gap-md">
-          <h1 className="content-title">{article.title}</h1>
+          <h1 className="content-title">
+            {article.link ? (
+              <a
+                className="content-title-link"
+                href={article.link}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openUrl(article.link!);
+                }}
+              >
+                {article.title}
+              </a>
+            ) : (
+              article.title
+            )}
+          </h1>
 
           <div className="flex gap-xs" style={{ flexShrink: 0 }}>
             <button
@@ -107,7 +150,7 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
         <div className="content-meta">
           {feedName && (
             <div className="flex items-center gap-xs">
-              <Rss size={14} />
+              {isYouTube ? <YouTubeIcon size={14} /> : <Rss size={14} />}
               <span>{feedName}</span>
             </div>
           )}
@@ -173,6 +216,12 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
           </div>
         )}
       </div>
+
+      {hoveredLink && (
+        <div className="content-status-bar" aria-hidden="true">
+          {hoveredLink}
+        </div>
+      )}
     </div>
   );
 }

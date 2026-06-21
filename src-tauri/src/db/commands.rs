@@ -154,6 +154,13 @@ pub async fn get_bookmarked_articles(db: State<'_, DbState>) -> Result<Vec<crate
 }
 
 #[tauri::command]
+pub async fn get_bookmark_count(db: State<'_, DbState>) -> Result<i64, String> {
+    let db = db.lock().await;
+    let count = db.get_bookmark_count().await.map_err(|e| e.to_string())?;
+    Ok(count)
+}
+
+#[tauri::command]
 pub async fn get_unread_articles(db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
     let db = db.lock().await;
     let articles = db.get_unread_articles().await.map_err(|e| e.to_string())?;

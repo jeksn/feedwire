@@ -26,12 +26,15 @@ const SORT_STORAGE_KEY      = 'feedwire-feed-sort';
 const COLLAPSE_STORAGE_KEY  = 'feedwire-folder-collapsed';
 const VIEW_OPTS_STORAGE_KEY = 'feedwire-view-opts';
 
+export type FeedSource = 'all' | 'rss' | 'youtube';
+
 interface ViewOptions {
   showAvatar:   boolean;
   showTypeBadge: boolean;
+  feedSource: FeedSource;
 }
 
-const DEFAULT_VIEW_OPTIONS: ViewOptions = { showAvatar: false, showTypeBadge: false };
+const DEFAULT_VIEW_OPTIONS: ViewOptions = { showAvatar: false, showTypeBadge: false, feedSource: 'all' };
 
 function loadViewOptions(): ViewOptions {
   try {
@@ -116,6 +119,7 @@ interface SidebarProps {
   selectedFeed: Feed | null;
   selectedView: 'feed' | 'unread' | 'bookmarks' | 'settings';
   unreadCounts: Record<string, number>;
+  bookmarkCount: number;
   onFeedSelect: (feed: Feed) => void;
   onUnreadSelect: () => void;
   onBookmarksSelect: () => void;
@@ -131,6 +135,7 @@ export function Sidebar({
   selectedFeed,
   selectedView,
   unreadCounts,
+  bookmarkCount,
   onFeedSelect,
   onUnreadSelect,
   onBookmarksSelect,
@@ -211,9 +216,9 @@ export function Sidebar({
     return () => document.removeEventListener('mousedown', close);
   }, [showViewMenu]);
 
-  const toggleViewOption = (key: keyof ViewOptions) => {
+  const toggleViewOption = (key: keyof ViewOptions, value?: unknown) => {
     setViewOptions(prev => {
-      const next = { ...prev, [key]: !prev[key] };
+      const next = { ...prev, [key]: value ?? !prev[key] };
       saveViewOptions(next);
       return next;
     });
@@ -248,13 +253,22 @@ export function Sidebar({
     setFolderContextMenu({ folder, x: e.clientX, y: e.clientY });
   };
 
+  // Apply feed-source filter (all / rss / youtube)
+  const sourceFilteredFeeds = useMemo(() => {
+    if (viewOptions.feedSource === 'all') return feeds;
+    return feeds.filter(f => {
+      const isYouTube = f.url.includes('youtube.com') || f.url.includes('youtu.be');
+      return viewOptions.feedSource === 'youtube' ? isYouTube : !isYouTube;
+    });
+  }, [feeds, viewOptions.feedSource]);
+
   // Group feeds by folder, applying search filter and sort within each group
   const { ungrouped, grouped, isSearching } = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const isSearching = q.length > 0;
     const filtered = isSearching
-      ? feeds.filter(f => f.title.toLowerCase().includes(q))
-      : feeds;
+      ? sourceFilteredFeeds.filter(f => f.title.toLowerCase().includes(q))
+      : sourceFilteredFeeds;
     const sorted = sortFeeds(filtered, sortOrder, unreadCounts);
     const ungrouped = sorted.filter(f => !f.folder_id);
     // When searching, flatten everything — no folder grouping
@@ -266,7 +280,7 @@ export function Sidebar({
       feeds: sorted.filter(f => f.folder_id === folder.id),
     }));
     return { ungrouped, grouped, isSearching };
-  }, [feeds, folders, sortOrder, searchQuery, unreadCounts]);
+  }, [sourceFilteredFeeds, folders, sortOrder, searchQuery, unreadCounts]);
 
   return (
     <div className="sidebar">
@@ -328,6 +342,9 @@ export function Sidebar({
               <Bookmark size={14} />
               <span>Bookmarks</span>
             </div>
+            {bookmarkCount > 0 && (
+              <span className="feed-count-subtle">{bookmarkCount}</span>
+            )}
           </div>
         </div>
       </div>
@@ -383,11 +400,12 @@ export function Sidebar({
             </button>
             {showViewMenu && (
               <div className="sidebar-view-menu">
+                <div className="sidebar-view-section">Display</div>
                 <label className="sidebar-view-option">
                   <input
                     type="checkbox"
                     checked={viewOptions.showAvatar}
-                    onChange={() => toggleViewOption('showAvatar')}
+                    onChange={() => toggleViewOption('showAvatar', !viewOptions.showAvatar)}
                   />
                   Show feed picture
                 </label>
@@ -395,9 +413,37 @@ export function Sidebar({
                   <input
                     type="checkbox"
                     checked={viewOptions.showTypeBadge}
-                    onChange={() => toggleViewOption('showTypeBadge')}
+                    onChange={() => toggleViewOption('showTypeBadge', !viewOptions.showTypeBadge)}
                   />
                   Show feed type
+                </label>
+                <div className="sidebar-view-section">Feed source</div>
+                <label className="sidebar-view-option">
+                  <input
+                    type="radio"
+                    name="feedSource"
+                    checked={viewOptions.feedSource === 'all'}
+                    onChange={() => toggleViewOption('feedSource', 'all')}
+                  />
+                  All feeds
+                </label>
+                <label className="sidebar-view-option">
+                  <input
+                    type="radio"
+                    name="feedSource"
+                    checked={viewOptions.feedSource === 'rss'}
+                    onChange={() => toggleViewOption('feedSource', 'rss')}
+                  />
+                  RSS only
+                </label>
+                <label className="sidebar-view-option">
+                  <input
+                    type="radio"
+                    name="feedSource"
+                    checked={viewOptions.feedSource === 'youtube'}
+                    onChange={() => toggleViewOption('feedSource', 'youtube')}
+                  />
+                  YouTube only
                 </label>
               </div>
             )}

@@ -22,6 +22,7 @@ function App() {
   const [showAddFeedDialog, setShowAddFeedDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [bookmarkCount, setBookmarkCount] = useState(0);
 
   // Keep stable refs so event listeners can read current state without
   // needing to be re-registered on every render.
@@ -49,7 +50,17 @@ function App() {
   useEffect(() => {
     loadFeeds();
     loadArticles();
+    loadBookmarkCount();
   }, []);
+
+  const loadBookmarkCount = async () => {
+    try {
+      const count = await feedApi.getBookmarkCount();
+      setBookmarkCount(count);
+    } catch (error) {
+      console.error('Failed to load bookmark count:', error);
+    }
+  };
 
   // When a background or launch refresh finishes, silently reload feeds and
   // articles so unread counts and article lists stay up to date.
@@ -347,6 +358,8 @@ function App() {
           setSelectedArticle(updatedArticle);
         }
       }
+      // Keep the sidebar bookmark badge in sync
+      loadBookmarkCount();
     } catch (error) {
       console.error("Failed to toggle bookmark:", error);
     }
@@ -374,6 +387,7 @@ function App() {
         onAddFeed={() => setShowAddFeedDialog(true)}
         onRefreshAll={handleRefreshAll}
         onFeedsChanged={loadFeeds}
+        bookmarkCount={bookmarkCount}
         loading={loading}
       />
 
@@ -415,6 +429,7 @@ function App() {
           onAddFeed={handleAddFeed}
         />
       )}
+
     </div>
   );
 }

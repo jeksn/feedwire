@@ -68,6 +68,10 @@ export const feedApi = {
     return await invoke('get_bookmarked_articles');
   },
 
+  getBookmarkCount: async (): Promise<number> => {
+    return await invoke('get_bookmark_count');
+  },
+
   getUnreadArticles: async (): Promise<Article[]> => {
     return await invoke('get_unread_articles');
   },

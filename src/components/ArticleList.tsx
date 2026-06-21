@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { RefreshCw, ExternalLink, CheckCheck, Trash2 } from 'lucide-react';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { RefreshCw, CheckCheck, Trash2 } from 'lucide-react';
 import type { Feed, Article } from '../types';
 
 interface ArticleListProps {
@@ -155,18 +154,6 @@ export function ArticleList({
                     <span className="text-xs">
                       • {feedTitleById[article.feed_id]}
                     </span>
-                  )}
-                  {article.link && (
-                    <button
-                      className="btn btn-icon btn-ghost ml-auto"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openUrl(article.link!).catch(console.error);
-                      }}
-                      title="Open in browser"
-                    >
-                      <ExternalLink size={12} />
-                    </button>
                   )}
                 </div>
                 
