@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, CheckCheck, Trash2, Bookmark, BookmarkCheck, Link2, ExternalLink, Circle, CheckCircle2 } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
+import { FeedAvatar } from './FeedAvatar';
 
 interface ArticleListProps {
   articles: Article[];
@@ -11,6 +12,8 @@ interface ArticleListProps {
   selectedFeed: Feed | null;
   /** All known feeds — used to show the source feed name in multi-feed views. */
   feeds?: Feed[];
+  /** Show the feed's avatar in each article row. Useful in multi-feed views like Bookmarks. */
+  showFeedAvatar?: boolean;
   title?: string;
   onRefreshFeed: () => void;
   onMarkAllRead?: () => void;
@@ -27,6 +30,7 @@ export function ArticleList({
   loading,
   selectedFeed,
   feeds,
+  showFeedAvatar,
   title,
   onRefreshFeed,
   onMarkAllRead,
@@ -38,10 +42,10 @@ export function ArticleList({
   const listRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{ article: Article; x: number; y: number } | null>(null);
 
-  // Build a fast id→title lookup. Only computed when feeds changes.
-  const feedTitleById = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const f of feeds ?? []) map[f.id] = f.title;
+  // Build a fast id→feed lookup for multi-feed meta / avatars.
+  const feedById = useMemo(() => {
+    const map: Record<string, Feed> = {};
+    for (const f of feeds ?? []) map[f.id] = f;
     return map;
   }, [feeds]);
 
@@ -169,29 +173,34 @@ export function ArticleList({
               onContextMenu={e => handleContextMenu(e, article)}
             >
               <div className="article-header">
-                <div className="article-title">
-                  {article.title}
-                </div>
-                
-                <div className="article-meta">
-                  <span className="text-xs">
-                    {formatDate(article.published_at)}
-                  </span>
-                  {feedTitleById[article.feed_id] && (
+                {showFeedAvatar && feedById[article.feed_id] && (
+                  <FeedAvatar feed={feedById[article.feed_id]} className="article-avatar" />
+                )}
+                <div className="article-content">
+                  <div className="article-title">
+                    {article.title}
+                  </div>
+                  
+                  <div className="article-meta">
                     <span className="text-xs">
-                      • {feedTitleById[article.feed_id]}
+                      {formatDate(article.published_at)}
                     </span>
-                  )}
-                </div>
-                
-                {(article.description || article.content) && (
-                  <div className="article-snippet">
-                    {truncateText(
-                      article.description || article.content || '',
-                      120
+                    {feedById[article.feed_id]?.title && (
+                      <span className="text-xs">
+                        • {feedById[article.feed_id].title}
+                      </span>
                     )}
                   </div>
-                )}
+                  
+                  {(article.description || article.content) && (
+                    <div className="article-snippet">
+                      {truncateText(
+                        article.description || article.content || '',
+                        120
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))

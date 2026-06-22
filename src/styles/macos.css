@@ -375,6 +375,23 @@ body {
 
 .article-header {
   padding: var(--spacing-md);
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+}
+
+.article-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.article-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .article-title {

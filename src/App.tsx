@@ -384,19 +384,27 @@ function App() {
   const handleToggleBookmark = async (articleId: string) => {
     try {
       const updatedArticle = await feedApi.toggleBookmark(articleId);
-      setArticles(prev => {
-        // In bookmarks view, remove article if it's been unbookmarked
-        if (selectedViewRef.current === 'bookmarks' && !updatedArticle.is_bookmarked) {
-          return prev.filter(a => a.id !== articleId);
+      const isBookmarks = selectedViewRef.current === 'bookmarks';
+      const removingFromBookmarks = isBookmarks && !updatedArticle.is_bookmarked;
+
+      if (removingFromBookmarks) {
+        // Remove the unbookmarked article from the list and move the selection
+        // to the nearest remaining article. Only fall back to the empty state
+        // when the last bookmark is removed.
+        const currentList = articlesRef.current;
+        const removedIndex = currentList.findIndex(a => a.id === articleId);
+        const nextList = currentList.filter(a => a.id !== articleId);
+        setArticles(nextList);
+
+        if (selectedArticleRef.current?.id === articleId) {
+          const nextArticle = nextList.length > 0
+            ? nextList[Math.max(0, removedIndex - 1)]
+            : null;
+          setSelectedArticle(nextArticle);
         }
-        return prev.map(a => a.id === articleId ? updatedArticle : a);
-      });
-      // Use ref for comparison so this works whether called from the button
-      // or from the keyboard shortcut (stale closure safe)
-      if (selectedArticleRef.current?.id === articleId) {
-        if (selectedViewRef.current === 'bookmarks' && !updatedArticle.is_bookmarked) {
-          setSelectedArticle(null);
-        } else {
+      } else {
+        setArticles(prev => prev.map(a => a.id === articleId ? updatedArticle : a));
+        if (selectedArticleRef.current?.id === articleId) {
           setSelectedArticle(updatedArticle);
         }
       }
@@ -455,6 +463,7 @@ function App() {
             loading={loading}
             selectedFeed={selectedFeed}
             feeds={feeds}
+            showFeedAvatar={selectedView === 'bookmarks'}
             title={articleListTitle}
             onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
             onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
