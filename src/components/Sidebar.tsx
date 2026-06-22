@@ -8,6 +8,7 @@ import { listen } from '@tauri-apps/api/event';
 import type { Feed, Folder } from '../types';
 import { feedApi } from '../api/feed';
 import { FeedAvatar } from './FeedAvatar';
+import { useContextMenuPosition } from '../hooks/useContextMenuPosition';
 
 interface RefreshProgress {
   done: number;
@@ -167,7 +168,6 @@ export function Sidebar({
   const doneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const viewMenuRef = useRef<HTMLDivElement>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const totalUnread = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
 
@@ -562,7 +562,6 @@ export function Sidebar({
       {/* Feed context menu portal */}
       {contextMenu && (
         <FeedContextMenu
-          ref={contextMenuRef}
           feed={feeds.find(f => f.id === contextMenu.feedId)!}
           x={contextMenu.x}
           y={contextMenu.y}
@@ -666,27 +665,18 @@ interface FeedContextMenuProps {
 const FeedContextMenu = ({
   feed, x, y, folders, onClose, onFolderCreated, onFeedsChanged, onMarkAllRead,
   onRefresh, onCopyUrl, onDelete,
-}: FeedContextMenuProps & { ref?: React.Ref<HTMLDivElement> }) => {
+}: FeedContextMenuProps) => {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const { ref: menuRef, style } = useContextMenuPosition(x, y, [creatingFolder, confirmingDelete, folders.length]);
   const currentFolderId = feed.folder_id;
 
   // Auto-focus new folder input
   useEffect(() => {
     if (creatingFolder) setTimeout(() => inputRef.current?.focus(), 0);
   }, [creatingFolder]);
-
-  // Clamp position so menu doesn't overflow viewport
-  const style = useMemo(() => {
-    const menuW = 200;
-    const menuH = creatingFolder ? 140 : confirmingDelete ? 120 : 190;
-    const left = Math.min(x, window.innerWidth - menuW - 8);
-    const top  = Math.min(y, window.innerHeight - menuH - 8);
-    return { left, top };
-  }, [x, y, folders.length, creatingFolder, confirmingDelete]);
 
   const assign = async (folderId: string | null) => {
     try {
@@ -843,18 +833,11 @@ function FolderContextMenu({ folder, x, y, onClose, onRenamed, onDeleted }: Fold
   const [mode, setMode] = useState<'menu' | 'rename' | 'delete'>('menu');
   const [renameValue, setRenameValue] = useState(folder.name);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { ref, style } = useContextMenuPosition(x, y, [mode]);
 
   useEffect(() => {
     if (mode === 'rename') setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 0);
   }, [mode]);
-
-  const style = useMemo(() => {
-    const menuW = 180;
-    const menuH = mode === 'rename' ? 100 : mode === 'delete' ? 120 : 100;
-    const left = Math.min(x, window.innerWidth - menuW - 8);
-    const top  = Math.min(y, window.innerHeight - menuH - 8);
-    return { left, top };
-  }, [x, y, mode]);
 
   const handleRename = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -881,6 +864,7 @@ function FolderContextMenu({ folder, x, y, onClose, onRenamed, onDeleted }: Fold
 
   return (
     <div
+      ref={ref}
       className="context-menu"
       style={{ position: 'fixed', ...style }}
       onMouseDown={e => e.stopPropagation()}

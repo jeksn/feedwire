@@ -3,6 +3,7 @@ import { RefreshCw, CheckCheck, Trash2, Bookmark, BookmarkCheck, Link2, External
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Feed, Article } from '../types';
 import { FeedAvatar } from './FeedAvatar';
+import { useContextMenuPosition } from '../hooks/useContextMenuPosition';
 
 interface ArticleListProps {
   articles: Article[];
@@ -241,16 +242,11 @@ const ArticleContextMenu = ({
   onToggleBookmark,
   onCopyUrl,
 }: ArticleContextMenuProps) => {
-  const style = useMemo(() => {
-    const menuW = 180;
-    const menuH = 140;
-    const left = Math.min(x, window.innerWidth - menuW - 8);
-    const top = Math.min(y, window.innerHeight - menuH - 8);
-    return { left, top };
-  }, [x, y]);
+  const { ref, style } = useContextMenuPosition(x, y);
 
   return (
     <div
+      ref={ref}
       className="context-menu"
       style={{ position: 'fixed', ...style }}
       onMouseDown={e => e.stopPropagation()}
