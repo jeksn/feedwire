@@ -175,7 +175,9 @@ export function ArticleList({
             >
               <div className="article-header">
                 {showFeedAvatar && feedById[article.feed_id] && (
-                  <FeedAvatar feed={feedById[article.feed_id]} className="article-avatar" />
+                  <div className="article-avatar-wrap">
+                    <FeedAvatar feed={feedById[article.feed_id]} className="article-avatar" />
+                  </div>
                 )}
                 <div className="article-content">
                   <div className="article-title">

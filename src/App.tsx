@@ -463,7 +463,7 @@ function App() {
             loading={loading}
             selectedFeed={selectedFeed}
             feeds={feeds}
-            showFeedAvatar={selectedView === 'bookmarks'}
+            showFeedAvatar={selectedView === 'bookmarks' || selectedView === 'unread'}
             title={articleListTitle}
             onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
             onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
