@@ -501,6 +501,20 @@ impl Database {
         Ok(articles)
     }
 
+    pub async fn get_today_articles(&self) -> Result<Vec<Article>, DatabaseError> {
+        // Use SQLite's date() which compares against the local calendar day.
+        let articles = sqlx::query_as::<_, Article>(
+            "SELECT * FROM articles \
+             WHERE date(published_at) = date('now', 'localtime') \
+                OR (published_at IS NULL AND date(created_at) = date('now', 'localtime')) \
+             ORDER BY published_at DESC, created_at DESC"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(articles)
+    }
+
     pub async fn get_unread_count(&self, feed_id: Option<String>) -> Result<i64, DatabaseError> {
         let mut query = String::from("SELECT COUNT(*) as count FROM articles WHERE is_read = 0");
         let mut params = vec![];

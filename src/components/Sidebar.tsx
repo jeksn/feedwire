@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Plus, RefreshCw, Rss, Bookmark, Inbox, Settings,
+  Plus, RefreshCw, Rss, Bookmark, Inbox, Settings, Sun,
   ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X, Eye,
   CheckCheck, Trash2, Link2,
 } from 'lucide-react';
@@ -120,10 +120,11 @@ interface FolderContextMenuState {
 interface SidebarProps {
   feeds: Feed[];
   selectedFeed: Feed | null;
-  selectedView: 'feed' | 'unread' | 'bookmarks' | 'settings';
+  selectedView: 'feed' | 'today' | 'unread' | 'bookmarks' | 'settings';
   unreadCounts: Record<string, number>;
   bookmarkCount: number;
   onFeedSelect: (feed: Feed) => void;
+  onTodaySelect: () => void;
   onUnreadSelect: () => void;
   onBookmarksSelect: () => void;
   onSettingsSelect: () => void;
@@ -144,6 +145,7 @@ export function Sidebar({
   unreadCounts,
   bookmarkCount,
   onFeedSelect,
+  onTodaySelect,
   onUnreadSelect,
   onBookmarksSelect,
   onSettingsSelect,
@@ -328,6 +330,18 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-nav">
+        <div
+          className={`list-item ${selectedView === 'today' ? 'active' : ''}`}
+          onClick={onTodaySelect}
+        >
+          <div className="feed-item">
+            <div className="flex items-center gap-sm feed-title">
+              <Sun size={14} />
+              <span>Today</span>
+            </div>
+          </div>
+        </div>
+
         <div
           className={`list-item ${selectedView === 'unread' ? 'active' : ''}`}
           onClick={onUnreadSelect}

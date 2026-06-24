@@ -76,6 +76,10 @@ export const feedApi = {
     return await invoke('get_unread_articles');
   },
 
+  getTodayArticles: async (): Promise<Article[]> => {
+    return await invoke('get_today_articles');
+  },
+
   markAllRead: async (feedId?: string): Promise<void> => {
     return await invoke('mark_all_read', { feedId });
   },

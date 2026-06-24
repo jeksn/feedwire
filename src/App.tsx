@@ -10,7 +10,7 @@ import { useTheme } from "./hooks/useTheme";
 import type { Feed, Article } from "./types";
 import "./styles/macos.css";
 
-type View = 'feed' | 'unread' | 'bookmarks' | 'settings';
+type View = 'feed' | 'today' | 'unread' | 'bookmarks' | 'settings';
 
 function App() {
   const { theme, setTheme } = useTheme();
@@ -18,7 +18,7 @@ function App() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedFeed, setSelectedFeed] = useState<Feed | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [selectedView, setSelectedView] = useState<View>('feed');
+  const [selectedView, setSelectedView] = useState<View>('today');
   const [showAddFeedDialog, setShowAddFeedDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -26,7 +26,7 @@ function App() {
 
   // Keep stable refs so event listeners can read current state without
   // needing to be re-registered on every render.
-  const selectedViewRef = useRef<View>('feed');
+  const selectedViewRef = useRef<View>('today');
   const selectedFeedRef = useRef<Feed | null>(null);
   const selectedArticleRef = useRef<Article | null>(null);
   const articlesRef = useRef<Article[]>([]);
@@ -49,7 +49,7 @@ function App() {
 
   useEffect(() => {
     loadFeeds();
-    loadArticles();
+    loadToday();
     loadBookmarkCount();
   }, []);
 
@@ -71,7 +71,8 @@ function App() {
         loadFeeds();
         const view = selectedViewRef.current;
         const feed = selectedFeedRef.current;
-        if (view === 'unread') loadUnread();
+        if (view === 'today') loadToday();
+        else if (view === 'unread') loadUnread();
         else if (view === 'bookmarks') loadBookmarks();
         else loadArticles(feed?.id);
       }
@@ -176,11 +177,30 @@ function App() {
     }
   };
 
+  const loadToday = async () => {
+    try {
+      setLoading(true);
+      const today = await feedApi.getTodayArticles();
+      setArticles(today);
+    } catch (error) {
+      console.error("Failed to load today's articles:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFeedSelect = (feed: Feed) => {
     setSelectedFeed(feed);
     setSelectedArticle(null);
     setSelectedView('feed');
     loadArticles(feed.id);
+  };
+
+  const handleTodaySelect = () => {
+    setSelectedFeed(null);
+    setSelectedArticle(null);
+    setSelectedView('today');
+    loadToday();
   };
 
   const handleUnreadSelect = () => {
@@ -331,6 +351,8 @@ function App() {
         loadBookmarks();
       } else if (selectedView === 'unread') {
         loadUnread();
+      } else if (selectedView === 'today') {
+        loadToday();
       } else {
         loadArticles(selectedFeed?.id);
       }
@@ -421,7 +443,9 @@ function App() {
   articleSelectRef.current = handleArticleSelect;
 
   const articleListTitle = selectedView === 'bookmarks' ? 'Bookmarks'
-    : selectedView === 'unread' ? 'Unread' : undefined;
+    : selectedView === 'unread' ? 'Unread'
+    : selectedView === 'today' ? 'Today'
+    : undefined;
 
   return (
     <div className="app-container">
@@ -431,6 +455,7 @@ function App() {
         selectedView={selectedView}
         unreadCounts={unreadCounts}
         onFeedSelect={handleFeedSelect}
+        onTodaySelect={handleTodaySelect}
         onUnreadSelect={handleUnreadSelect}
         onBookmarksSelect={handleBookmarksSelect}
         onSettingsSelect={handleSettingsSelect}
@@ -463,7 +488,7 @@ function App() {
             loading={loading}
             selectedFeed={selectedFeed}
             feeds={feeds}
-            showFeedAvatar={selectedView === 'bookmarks' || selectedView === 'unread'}
+            showFeedAvatar={selectedView === 'bookmarks' || selectedView === 'unread' || selectedView === 'today'}
             title={articleListTitle}
             onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
             onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}

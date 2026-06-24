@@ -195,7 +195,7 @@ export function ArticleList({
                     )}
                   </div>
                   
-                  {(article.description || article.content) && (
+                  {!showFeedAvatar && (article.description || article.content) && (
                     <div className="article-snippet">
                       {truncateText(
                         article.description || article.content || '',
