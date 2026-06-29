@@ -30,6 +30,11 @@ function App() {
   const selectedFeedRef = useRef<Feed | null>(null);
   const selectedArticleRef = useRef<Article | null>(null);
   const articlesRef = useRef<Article[]>([]);
+  // In the Bookmarks view, when the user removes a bookmark we don't
+  // evict the article immediately (NetNewsWire-style deferred removal).
+  // Instead we record its id here and only remove it from the list once
+  // the user navigates to a different article.
+  const pendingBookmarkRemovalId = useRef<string | null>(null);
   // Ref to the latest handleToggleBookmark / handleArticleSelect so the
   // keyboard shortcut effect (registered once with [] deps) always calls
   // the current version without needing to re-register.
@@ -246,6 +251,18 @@ function App() {
   };
 
   const handleArticleSelect = async (article: Article) => {
+    // Flush deferred bookmark removal: if the user previously unbookmarked an
+    // article and is now navigating away from it, remove it from the list now.
+    const pendingId = pendingBookmarkRemovalId.current;
+    if (pendingId && pendingId !== article.id) {
+      pendingBookmarkRemovalId.current = null;
+      const currentList = articlesRef.current;
+      const removedIndex = currentList.findIndex(a => a.id === pendingId);
+      const nextList = currentList.filter(a => a.id !== pendingId);
+      // Only update if the article is actually still in the list
+      if (removedIndex !== -1) setArticles(nextList);
+    }
+
     setSelectedArticle(article);
 
     if (!article.is_read) {
@@ -410,21 +427,21 @@ function App() {
       const removingFromBookmarks = isBookmarks && !updatedArticle.is_bookmarked;
 
       if (removingFromBookmarks) {
-        // Remove the unbookmarked article from the list and move the selection
-        // to the nearest remaining article. Only fall back to the empty state
-        // when the last bookmark is removed.
-        const currentList = articlesRef.current;
-        const removedIndex = currentList.findIndex(a => a.id === articleId);
-        const nextList = currentList.filter(a => a.id !== articleId);
-        setArticles(nextList);
-
+        // NetNewsWire-style deferred removal: keep the article visible (and
+        // selected) so the user can re-bookmark it immediately. The article
+        // will be evicted from the list once the user navigates to a different
+        // article (see handleArticleSelect). Update the bookmark icon in-place.
+        pendingBookmarkRemovalId.current = articleId;
+        setArticles(prev => prev.map(a => a.id === articleId ? updatedArticle : a));
         if (selectedArticleRef.current?.id === articleId) {
-          const nextArticle = nextList.length > 0
-            ? nextList[Math.max(0, removedIndex - 1)]
-            : null;
-          setSelectedArticle(nextArticle);
+          setSelectedArticle(updatedArticle);
         }
       } else {
+        // Re-bookmarking (or toggling in a non-bookmarks view) — clear any
+        // pending removal for this article and update it in place.
+        if (pendingBookmarkRemovalId.current === articleId) {
+          pendingBookmarkRemovalId.current = null;
+        }
         setArticles(prev => prev.map(a => a.id === articleId ? updatedArticle : a));
         if (selectedArticleRef.current?.id === articleId) {
           setSelectedArticle(updatedArticle);
