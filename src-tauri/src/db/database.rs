@@ -160,6 +160,10 @@ impl Database {
         .await;
         // Ignore error — column already exists on new DBs created after this migration
 
+        sqlx::query("DELETE FROM articles WHERE feed_id IN (SELECT id FROM feeds WHERE is_active = 0)")
+            .execute(&self.pool)
+            .await?;
+
         Ok(())
     }
 
@@ -326,19 +330,34 @@ impl Database {
     }
 
     pub async fn delete_feed(&self, id: &str) -> Result<(), DatabaseError> {
-        sqlx::query("UPDATE feeds SET is_active = 0 WHERE id = ?")
+        let mut transaction = self.pool.begin().await?;
+
+        sqlx::query("DELETE FROM articles WHERE feed_id = ?")
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await?;
 
+        sqlx::query("UPDATE feeds SET is_active = 0 WHERE id = ?")
+            .bind(id)
+            .execute(&mut *transaction)
+            .await?;
+
+        transaction.commit().await?;
         Ok(())
     }
 
     pub async fn delete_all_feeds(&self) -> Result<usize, DatabaseError> {
-        let result = sqlx::query("UPDATE feeds SET is_active = 0 WHERE is_active = 1")
-            .execute(&self.pool)
+        let mut transaction = self.pool.begin().await?;
+
+        sqlx::query("DELETE FROM articles WHERE feed_id IN (SELECT id FROM feeds WHERE is_active = 1)")
+            .execute(&mut *transaction)
             .await?;
 
+        let result = sqlx::query("UPDATE feeds SET is_active = 0 WHERE is_active = 1")
+            .execute(&mut *transaction)
+            .await?;
+
+        transaction.commit().await?;
         Ok(result.rows_affected() as usize)
     }
 

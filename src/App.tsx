@@ -246,7 +246,9 @@ function App() {
     setArticles([]);
     setSelectedFeed(null);
     setSelectedArticle(null);
+    pendingBookmarkRemovalId.current = null;
     setUnreadCounts({});
+    setBookmarkCount(0);
     return count;
   };
 
@@ -336,12 +338,19 @@ function App() {
         delete next[feedId];
         return next;
       });
+      setArticles(prev => prev.filter(article => article.feed_id !== feedId));
+      const pendingArticle = articlesRef.current.find(article => article.id === pendingBookmarkRemovalId.current);
+      if (pendingArticle?.feed_id === feedId) {
+        pendingBookmarkRemovalId.current = null;
+      }
+      if (selectedArticle?.feed_id === feedId) {
+        setSelectedArticle(null);
+      }
       if (selectedFeed?.id === feedId) {
         setSelectedFeed(null);
         setSelectedView('feed');
-        setArticles([]);
-        setSelectedArticle(null);
       }
+      await loadBookmarkCount();
     } catch (error) {
       console.error("Failed to delete feed:", error);
     }

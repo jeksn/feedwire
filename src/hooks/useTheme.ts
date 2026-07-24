@@ -19,7 +19,7 @@ function applyTheme(pref: ThemePreference) {
 
 export function useTheme() {
   const [theme, setThemeState] = useState<ThemePreference>(() => {
-    return (localStorage.getItem(STORAGE_KEY) as ThemePreference) ?? 'system';
+    return (window.localStorage.getItem(STORAGE_KEY) as ThemePreference) ?? 'system';
   });
 
   // Apply on mount and whenever preference changes
@@ -37,7 +37,7 @@ export function useTheme() {
   }, [theme]);
 
   const setTheme = (pref: ThemePreference) => {
-    localStorage.setItem(STORAGE_KEY, pref);
+    window.localStorage.setItem(STORAGE_KEY, pref);
     setThemeState(pref);
   };
 

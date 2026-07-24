@@ -15,7 +15,7 @@ function mockMatchMedia(prefersDark: boolean) {
 }
 
 beforeEach(() => {
-  localStorage.clear();
+  window.localStorage.clear();
   mockMatchMedia(false); // default: light OS theme
   // Reset data-theme attribute
   document.documentElement.removeAttribute('data-theme');
@@ -28,7 +28,7 @@ describe('useTheme', () => {
   });
 
   it('restores persisted preference from localStorage', () => {
-    localStorage.setItem('feedwire-theme', 'dark');
+    window.localStorage.setItem('feedwire-theme', 'dark');
     const { result } = renderHook(() => useTheme());
     expect(result.current.theme).toBe('dark');
   });
@@ -62,7 +62,7 @@ describe('useTheme', () => {
   it('persists preference to localStorage', () => {
     const { result } = renderHook(() => useTheme());
     act(() => result.current.setTheme('dark'));
-    expect(localStorage.getItem('feedwire-theme')).toBe('dark');
+    expect(window.localStorage.getItem('feedwire-theme')).toBe('dark');
   });
 
   it('updates theme state when setTheme is called', () => {

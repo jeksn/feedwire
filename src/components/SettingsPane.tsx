@@ -197,8 +197,8 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
                   <span className="settings-action-title">Delete All Feeds</span>
                 </div>
                 <p className="settings-action-description">
-                  Permanently removes all {feedCount} {feedCount === 1 ? 'feed' : 'feeds'} and
-                  their articles. This cannot be undone.
+                  Permanently removes all {feedCount} {feedCount === 1 ? 'feed' : 'feeds'},
+                  their articles, and saved bookmarks. This cannot be undone.
                 </p>
               </div>
               {deleteAllStatus.type === 'done' ? (

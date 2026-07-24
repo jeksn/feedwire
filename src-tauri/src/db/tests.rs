@@ -254,20 +254,44 @@ async fn create_or_reactivate_returns_duplicate_for_active_feed() {
     assert!(matches!(result, Err(crate::db::DatabaseError::DuplicateUrl)));
 }
 
-// ── Cascade delete ─────────────────────────────────────────────────────────
+// ── Feed deletion ─────────────────────────────────────────────────────────
 
 #[tokio::test]
-async fn deleting_feed_articles_cascade() {
+async fn deleting_feed_removes_its_articles_and_bookmarks() {
     let db = test_db().await;
     let feed = db.create_feed(new_feed("Feed", "https://example.com/rss")).await.unwrap();
-    db.create_article(new_article(&feed.id, "Post", "guid-1")).await.unwrap();
+    let article = db.create_article(new_article(&feed.id, "Post", "guid-1")).await.unwrap();
+    db.update_article(&article.id, crate::db::ArticleUpdate {
+        is_bookmarked: Some(true),
+        ..Default::default()
+    }).await.unwrap();
 
-    // Soft-delete the feed
     db.delete_feed(&feed.id).await.unwrap();
 
-    // Articles for that feed are still in the DB (soft delete doesn't cascade),
-    // but since the feed is inactive the unread count should be 0 via feed lookup.
-    // The important thing is there's no panic / FK violation.
-    let feeds = db.get_feeds().await.unwrap();
-    assert!(feeds.is_empty());
+    assert!(db.get_feeds().await.unwrap().is_empty());
+    assert!(db.get_articles(Some(feed.id), None, None).await.unwrap().is_empty());
+    assert!(db.get_bookmarked_articles().await.unwrap().is_empty());
+    assert_eq!(db.get_bookmark_count().await.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn deleting_all_feeds_removes_all_articles_and_bookmarks() {
+    let db = test_db().await;
+    let feed_a = db.create_feed(new_feed("Feed A", "https://a.example/rss")).await.unwrap();
+    let feed_b = db.create_feed(new_feed("Feed B", "https://b.example/rss")).await.unwrap();
+    let article_a = db.create_article(new_article(&feed_a.id, "Post A", "guid-a")).await.unwrap();
+    let article_b = db.create_article(new_article(&feed_b.id, "Post B", "guid-b")).await.unwrap();
+    for article in [article_a, article_b] {
+        db.update_article(&article.id, crate::db::ArticleUpdate {
+            is_bookmarked: Some(true),
+            ..Default::default()
+        }).await.unwrap();
+    }
+
+    assert_eq!(db.delete_all_feeds().await.unwrap(), 2);
+
+    assert!(db.get_feeds().await.unwrap().is_empty());
+    assert!(db.get_articles(None, None, None).await.unwrap().is_empty());
+    assert!(db.get_bookmarked_articles().await.unwrap().is_empty());
+    assert_eq!(db.get_bookmark_count().await.unwrap(), 0);
 }
