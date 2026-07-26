@@ -29,6 +29,7 @@ fn new_article(feed_id: &str, title: &str, guid: &str) -> NewArticle {
         link: Some(format!("https://example.com/{}", guid)),
         description: Some("An article description".to_string()),
         content: None,
+        thumbnail_url: None,
         author: Some("Author Name".to_string()),
         published_at: Some(chrono::Utc::now()),
         guid: Some(guid.to_string()),
@@ -112,8 +113,25 @@ async fn create_and_get_article() {
     assert!(!article.id.is_empty());
     assert_eq!(article.title, "First Post");
     assert_eq!(article.feed_id, feed.id);
+    assert!(article.thumbnail_url.is_none());
     assert!(!article.is_read);
     assert!(!article.is_bookmarked);
+}
+
+#[tokio::test]
+async fn article_thumbnail_is_persisted() {
+    let db = test_db().await;
+    let feed = db.create_feed(new_feed("Feed", "https://example.com/rss")).await.unwrap();
+    let mut new_article = new_article(&feed.id, "Video", "guid-1");
+    new_article.thumbnail_url = Some("https://i.ytimg.com/vi/video/hqdefault.jpg".to_string());
+
+    let article = db.create_article(new_article).await.unwrap();
+    let fetched = db.get_article_by_id(&article.id).await.unwrap();
+
+    assert_eq!(
+        fetched.thumbnail_url.as_deref(),
+        Some("https://i.ytimg.com/vi/video/hqdefault.jpg")
+    );
 }
 
 #[tokio::test]

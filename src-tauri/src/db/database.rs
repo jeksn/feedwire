@@ -71,6 +71,7 @@ impl Database {
                 link TEXT,
                 description TEXT,
                 content TEXT,
+                thumbnail_url TEXT,
                 author TEXT,
                 published_at TEXT,
                 created_at TEXT NOT NULL,
@@ -159,6 +160,10 @@ impl Database {
         .execute(&self.pool)
         .await;
         // Ignore error — column already exists on new DBs created after this migration
+
+        let _ = sqlx::query("ALTER TABLE articles ADD COLUMN thumbnail_url TEXT")
+            .execute(&self.pool)
+            .await;
 
         sqlx::query("DELETE FROM articles WHERE feed_id IN (SELECT id FROM feeds WHERE is_active = 0)")
             .execute(&self.pool)
@@ -373,6 +378,7 @@ impl Database {
             link: article.link,
             description: article.description,
             content: article.content,
+            thumbnail_url: article.thumbnail_url,
             author: article.author,
             published_at: article.published_at,
             created_at: now,
@@ -384,8 +390,8 @@ impl Database {
 
         sqlx::query(
             r#"
-            INSERT OR IGNORE INTO articles (id, feed_id, title, link, description, content, author, published_at, created_at, updated_at, is_read, is_bookmarked, guid)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO articles (id, feed_id, title, link, description, content, thumbnail_url, author, published_at, created_at, updated_at, is_read, is_bookmarked, guid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&article.id)
@@ -394,6 +400,7 @@ impl Database {
         .bind(&article.link)
         .bind(&article.description)
         .bind(&article.content)
+        .bind(&article.thumbnail_url)
         .bind(&article.author)
         .bind(&article.published_at)
         .bind(&article.created_at)

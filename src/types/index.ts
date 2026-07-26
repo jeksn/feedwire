@@ -23,6 +23,7 @@ export interface Article {
   link?: string;
   description?: string;
   content?: string;
+  thumbnail_url?: string;
   author?: string;
   published_at?: string;
   created_at: string;

@@ -466,6 +466,12 @@ body {
   text-decoration: underline;
 }
 
+.content-title-external-link {
+  display: inline-block;
+  margin-left: var(--spacing-xs);
+  vertical-align: -0.08em;
+}
+
 .content-meta {
   font-size: var(--font-size-sm);
   color: var(--macos-text-secondary);
@@ -531,7 +537,7 @@ body {
 .yt-thumbnail {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   transition: opacity 0.2s;
 }

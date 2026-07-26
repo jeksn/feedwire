@@ -24,6 +24,16 @@ fn strip_html_tags(html: &str) -> String {
         .to_string()
 }
 
+fn media_thumbnail_url(entry: &feed_rs::model::Entry) -> Option<String> {
+    entry
+        .media
+        .iter()
+        .flat_map(|media| media.thumbnails.iter())
+        .map(|thumbnail| thumbnail.image.uri.as_str())
+        .find(|url| !url.is_empty())
+        .map(String::from)
+}
+
 /// Extract the channel_id from a YouTube RSS feed URL.
 /// e.g. https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxx → "UCxxxxxxxx"
 fn youtube_channel_id_from_feed_url(feed_url: &str) -> Option<String> {
@@ -119,6 +129,7 @@ impl FeedParser {
 
         let mut articles = Vec::new();
         for entry in parsed_feed.entries {
+            let thumbnail_url = media_thumbnail_url(&entry);
             let published_at = entry.published.or(entry.updated).map(|dt| {
                 DateTime::<Utc>::from_timestamp(dt.timestamp(), dt.nanosecond() as u32)
                     .unwrap_or_else(|| Utc::now())
@@ -173,6 +184,7 @@ impl FeedParser {
                 link: entry.links.first().map(|l| l.href.clone()),
                 description,
                 content,
+                thumbnail_url,
                 author: entry.authors.first().map(|a| a.name.clone()),
                 published_at,
                 guid: Some(entry.id),
@@ -362,6 +374,17 @@ impl Default for FeedParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extracts_media_rss_thumbnail() {
+        let xml = br#"<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/"><title>Channel</title><id>channel</id><updated>2026-01-01T00:00:00Z</updated><entry><id>video</id><title>Video</title><updated>2026-01-01T00:00:00Z</updated><media:group><media:thumbnail url="https://i.ytimg.com/vi/video/hqdefault.jpg" /></media:group></entry></feed>"#;
+        let feed = parser::parse(&xml[..]).unwrap();
+
+        assert_eq!(
+            media_thumbnail_url(&feed.entries[0]),
+            Some("https://i.ytimg.com/vi/video/hqdefault.jpg".to_string())
+        );
+    }
 
     // ── is_youtube_channel ──────────────────────────────────────────────────
 

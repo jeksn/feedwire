@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Bookmark, BookmarkCheck, ExternalLink, Calendar, Rss, Play } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bookmark, BookmarkCheck, ExternalLink, Calendar, Rss } from 'lucide-react';
 import { openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
 import type { Article, Feed } from '../types';
 
@@ -34,8 +34,26 @@ function extractFirstImage(html: string): string | null {
   return m ? m[1] : null;
 }
 
+function youtubeThumbnailUrl(link: string | undefined, size: 'maxresdefault' | 'hqdefault'): string | null {
+  if (!link) return null;
+  try {
+    const url = new URL(link);
+    const videoId = url.hostname.endsWith('youtu.be')
+      ? url.pathname.split('/').filter(Boolean)[0]
+      : url.searchParams.get('v');
+    return videoId ? `https://i.ytimg.com/vi/${videoId}/${size}.jpg` : null;
+  } catch {
+    return null;
+  }
+}
+
 export function ContentPane({ article, feeds, onToggleBookmark }: ContentPaneProps) {
   const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+  const [highResolutionThumbnailFailed, setHighResolutionThumbnailFailed] = useState(false);
+
+  useEffect(() => {
+    setHighResolutionThumbnailFailed(false);
+  }, [article?.id]);
 
   const feed = article ? (feeds?.find(f => f.id === article.feed_id) ?? null) : null;
   const feedName = feed?.title ?? null;
@@ -44,8 +62,13 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
   const bodyHtml = article ? (article.content || article.description || '') : '';
   const hasBody = bodyHtml.trim().length > 0 && !isYouTube;
 
-  // Pull thumbnail from description HTML if present (YouTube includes it)
-  const thumbnail = isYouTube && bodyHtml ? extractFirstImage(bodyHtml) : null;
+  const fallbackThumbnail = article?.thumbnail_url
+    ?? (bodyHtml ? extractFirstImage(bodyHtml) : null)
+    ?? youtubeThumbnailUrl(article?.link, 'hqdefault');
+  const highResolutionThumbnail = youtubeThumbnailUrl(article?.link, 'maxresdefault');
+  const thumbnail = isYouTube
+    ? (highResolutionThumbnailFailed ? fallbackThumbnail : highResolutionThumbnail ?? fallbackThumbnail)
+    : null;
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
@@ -114,8 +137,10 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
                   e.preventDefault();
                   openUrl(article.link!);
                 }}
+                title="Open in browser"
               >
                 {article.title}
+                <ExternalLink className="content-title-external-link" size={16} aria-hidden="true" />
               </a>
             ) : (
               article.title
@@ -135,15 +160,6 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
               )}
             </button>
 
-            {article.link && (
-              <button
-                className="btn btn-icon btn-ghost"
-                onClick={() => openUrl(article.link!)}
-                title="Open in browser"
-              >
-                <ExternalLink size={18} />
-              </button>
-            )}
           </div>
         </div>
 
@@ -170,25 +186,21 @@ export function ContentPane({ article, feeds, onToggleBookmark }: ContentPanePro
 
       <div className="content-body" onClick={handleContentClick}>
         {isYouTube ? (
-          <div className="yt-card">
-            {thumbnail && (
+          thumbnail && (
+            <div className="yt-card">
               <div className="yt-thumbnail-wrap" onClick={() => article.link && openUrl(article.link)}>
-                <img className="yt-thumbnail" src={thumbnail} alt="" />
+                <img
+                  className="yt-thumbnail"
+                  src={thumbnail}
+                  alt=""
+                  onError={() => setHighResolutionThumbnailFailed(true)}
+                />
                 <div className="yt-play-overlay">
-                  <Play size={48} fill="white" stroke="none" />
+                  <ExternalLink size={40} />
                 </div>
               </div>
-            )}
-            <div className="yt-card-body">
-              <p className="yt-card-hint">YouTube videos can't be played inline.</p>
-              {article.link && (
-                <button className="btn btn-primary yt-watch-btn" onClick={() => openUrl(article.link!)}>
-                  <Play size={16} />
-                  Watch on YouTube
-                </button>
-              )}
             </div>
-          </div>
+          )
         ) : hasBody ? (
           hasHtml ? (
             <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />

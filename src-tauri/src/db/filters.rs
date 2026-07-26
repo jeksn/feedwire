@@ -61,6 +61,7 @@ mod tests {
             link: link.map(String::from),
             description: None,
             content: None,
+            thumbnail_url: None,
             author: None,
             published_at: Some(Utc::now()),
             guid: None,
