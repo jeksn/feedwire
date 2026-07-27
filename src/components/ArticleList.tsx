@@ -16,7 +16,7 @@ interface ArticleListProps {
   /** Show the feed's avatar in each article row. Useful in multi-feed views like Bookmarks. */
   showFeedAvatar?: boolean;
   title?: string;
-  onRefreshFeed: () => void;
+  onRefreshFeed?: () => void;
   onMarkAllRead?: () => void;
   onDeleteFeed?: () => void;
   onMarkArticleRead?: (articleId: string, isRead: boolean) => void;
@@ -125,14 +125,16 @@ export function ArticleList({
                 <CheckCheck size={16} />
               </button>
             )}
-            <button
-              className="btn btn-icon btn-ghost"
-              onClick={onRefreshFeed}
-              disabled={loading}
-              title="Refresh feed"
-            >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            </button>
+            {onRefreshFeed && (
+              <button
+                className="btn btn-icon btn-ghost"
+                onClick={onRefreshFeed}
+                disabled={loading}
+                title="Refresh feed"
+              >
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              </button>
+            )}
             {onDeleteFeed && (
               <button
                 className="btn btn-icon btn-ghost"

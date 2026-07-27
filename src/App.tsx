@@ -516,7 +516,7 @@ function App() {
             feeds={feeds}
             showFeedAvatar={selectedView === 'bookmarks' || selectedView === 'unread' || selectedView === 'today'}
             title={articleListTitle}
-            onRefreshFeed={() => selectedFeed && handleRefreshFeed(selectedFeed.id)}
+            onRefreshFeed={selectedView === 'feed' && selectedFeed ? () => handleRefreshFeed(selectedFeed.id) : undefined}
             onMarkAllRead={selectedView !== 'bookmarks' ? handleMarkAllRead : undefined}
             onDeleteFeed={selectedView === 'feed' && selectedFeed ? () => handleDeleteFeed(selectedFeed.id) : undefined}
             onMarkArticleRead={handleMarkArticleRead}
