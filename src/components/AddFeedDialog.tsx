@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Link, Video } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface AddFeedDialogProps {
   onClose: () => void;
@@ -57,24 +57,15 @@ export function AddFeedDialog({ onClose, onAddFeed }: AddFeedDialogProps) {
               <label className="block text-sm font-medium mb-xs">
                 Feed URL
               </label>
-              <div className="relative">
-                <input
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com/feed.xml"
-                  className="input pr-lg"
-                  autoFocus
-                  disabled={loading}
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-sm">
-                  {url.includes('youtube.com') ? (
-                    <Video size={16} className="text-secondary" />
-                  ) : (
-                    <Link size={16} className="text-secondary" />
-                  )}
-                </div>
-              </div>
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com/feed.xml"
+                className="input"
+                autoFocus
+                disabled={loading}
+              />
               {error && (
                 <div className="text-xs text-error mt-xs">
                   {error}
@@ -82,23 +73,11 @@ export function AddFeedDialog({ onClose, onAddFeed }: AddFeedDialogProps) {
               )}
             </div>
 
-            <div className="text-xs text-secondary">
-              <p className="mb-sm">
-                <strong>Supported formats:</strong> RSS, Atom, and YouTube channels
-              </p>
-              <p className="mb-sm">
-                <strong>YouTube:</strong> Only direct channel URLs are supported (format: https://www.youtube.com/channel/CHANNEL_ID)
-              </p>
-              <p>
-                <strong>Examples:</strong>
-              </p>
-              <ul className="ml-sm mt-xs">
-                <li>• https://example.com/feed.xml</li>
-                <li>• https://youtube.com/channel/UCBJycsmduvYEL83R_U4JriQ</li>
-              </ul>
-              <p className="mt-sm text-xs">
-                <strong>Note:</strong> Custom YouTube URLs (@username) are not yet supported.
-              </p>
+            <div className="add-feed-supported">
+              <span className="add-feed-supported-label">Supported</span>
+              <span className="add-feed-supported-tag">RSS</span>
+              <span className="add-feed-supported-tag">Atom</span>
+              <span className="add-feed-supported-tag">YouTube</span>
             </div>
           </div>
 

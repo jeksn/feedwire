@@ -31,6 +31,18 @@ export const feedApi = {
     return await invoke('delete_all_feeds');
   },
 
+  archiveFeed: async (feedId: string): Promise<void> => {
+    return await invoke('archive_feed', { feedId });
+  },
+
+  unarchiveFeed: async (feedId: string): Promise<void> => {
+    return await invoke('unarchive_feed', { feedId });
+  },
+
+  getArchivedFeeds: async (): Promise<Feed[]> => {
+    return await invoke('get_archived_feeds');
+  },
+
   refreshFeed: async (feedId: string): Promise<Article[]> => {
     return await invoke('refresh_feed', { feedId });
   },

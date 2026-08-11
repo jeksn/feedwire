@@ -8,6 +8,8 @@ export interface Feed {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  /** Archived feeds are hidden from the feed list but can be restored. */
+  is_archived: boolean;
   /** Foreign key into folders; null means ungrouped. */
   folder_id?: string | null;
   /** ISO timestamp of the most recently published article for this feed. */

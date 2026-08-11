@@ -165,6 +165,11 @@ impl Database {
             .execute(&self.pool)
             .await;
 
+        // Add is_archived to feeds if it doesn't exist yet (safe on existing DBs)
+        let _ = sqlx::query("ALTER TABLE feeds ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT 0")
+            .execute(&self.pool)
+            .await;
+
         sqlx::query("DELETE FROM articles WHERE feed_id IN (SELECT id FROM feeds WHERE is_active = 0)")
             .execute(&self.pool)
             .await?;
@@ -187,6 +192,7 @@ impl Database {
             created_at: now,
             updated_at: now,
             is_active: true,
+            is_archived: false,
             folder_id: None,
             latest_article_at: None,
             icon_url: feed.icon_url,
@@ -220,12 +226,12 @@ impl Database {
             SELECT
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
-                f.folder_id,
+                f.is_archived, f.folder_id,
                 MAX(a.published_at) AS latest_article_at,
                 f.icon_url
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
-            WHERE f.is_active = 1
+            WHERE f.is_active = 1 AND f.is_archived = 0
             GROUP BY f.id
             ORDER BY f.title
             "#,
@@ -242,12 +248,12 @@ impl Database {
             SELECT
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
-                f.folder_id,
+                f.is_archived, f.folder_id,
                 MAX(a.published_at) AS latest_article_at,
                 f.icon_url
             FROM feeds f
             LEFT JOIN articles a ON a.feed_id = f.id
-            WHERE f.id = ? AND f.is_active = 1
+            WHERE f.id = ? AND f.is_active = 1 AND f.is_archived = 0
             GROUP BY f.id
             "#,
         )
@@ -289,7 +295,7 @@ impl Database {
             SELECT
                 f.id, f.title, f.url, f.description, f.feed_type,
                 f.last_fetched, f.created_at, f.updated_at, f.is_active,
-                f.folder_id,
+                f.is_archived, f.folder_id,
                 MAX(a.published_at) AS latest_article_at,
                 f.icon_url
             FROM feeds f
@@ -311,14 +317,14 @@ impl Database {
     pub async fn create_or_reactivate_feed(&self, feed: NewFeed) -> Result<Feed, DatabaseError> {
         // Check whether a row with this URL already exists (active or not)
         if let Some(existing) = self.get_feed_by_url(&feed.url).await? {
-            if existing.is_active {
-                // Already active — treat as duplicate
+            if existing.is_active && !existing.is_archived {
+                // Already active and not archived — treat as duplicate
                 return Err(DatabaseError::DuplicateUrl);
             }
-            // Reactivate the existing row with fresh metadata
+            // Reactivate the existing row with fresh metadata, clear archive flag
             let now = chrono::Utc::now().to_rfc3339();
             sqlx::query(
-                "UPDATE feeds SET title = ?, description = ?, is_active = 1, updated_at = ? WHERE id = ?"
+                "UPDATE feeds SET title = ?, description = ?, is_active = 1, is_archived = 0, updated_at = ? WHERE id = ?"
             )
             .bind(&feed.title)
             .bind(&feed.description)
@@ -364,6 +370,52 @@ impl Database {
 
         transaction.commit().await?;
         Ok(result.rows_affected() as usize)
+    }
+
+    // ── Archive ───────────────────────────────────────────────────────────────
+
+    /// Archive a feed: hide it from the active feed list without deleting its
+    /// data. The feed can be restored later via `unarchive_feed`.
+    pub async fn archive_feed(&self, id: &str) -> Result<(), DatabaseError> {
+        sqlx::query("UPDATE feeds SET is_archived = 1, updated_at = ? WHERE id = ?")
+            .bind(chrono::Utc::now().to_rfc3339())
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Restore an archived feed back to the active feed list.
+    pub async fn unarchive_feed(&self, id: &str) -> Result<(), DatabaseError> {
+        sqlx::query("UPDATE feeds SET is_archived = 0, updated_at = ? WHERE id = ?")
+            .bind(chrono::Utc::now().to_rfc3339())
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Get all archived feeds (active feeds that are marked as archived).
+    pub async fn get_archived_feeds(&self) -> Result<Vec<Feed>, DatabaseError> {
+        let feeds = sqlx::query_as::<_, Feed>(
+            r#"
+            SELECT
+                f.id, f.title, f.url, f.description, f.feed_type,
+                f.last_fetched, f.created_at, f.updated_at, f.is_active,
+                f.is_archived, f.folder_id,
+                MAX(a.published_at) AS latest_article_at,
+                f.icon_url
+            FROM feeds f
+            LEFT JOIN articles a ON a.feed_id = f.id
+            WHERE f.is_active = 1 AND f.is_archived = 1
+            GROUP BY f.id
+            ORDER BY f.title
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(feeds)
     }
 
     // Article operations

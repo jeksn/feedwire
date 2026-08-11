@@ -339,12 +339,38 @@ impl FeedParser {
         let html = response.text().await?;
         println!("Got {} bytes from channel page", html.len());
 
-        // Channel IDs are always "UC" followed by exactly 22 base64url characters (24 chars total)
+        // The channel page contains many UC... strings, but the real channel
+        // ID appears in specific contexts. Prefer these anchored patterns in
+        // order of reliability; fall back to the most frequent UC... match.
+        let patterns = [
+            // <link> canonical / alternate: youtube.com/channel/UC...
+            r#"youtube\.com/channel/(UC[0-9A-Za-z_-]{22})"#,
+            // RSS feed link: videos.xml?channel_id=UC...
+            r#"channel_id=(UC[0-9A-Za-z_-]{22})"#,
+            // og:url / al:web:url meta tags
+            r#"<meta property="og:url" content="https://www\.youtube\.com/channel/(UC[0-9A-Za-z_-]{22})"#,
+        ];
+        for pattern in patterns {
+            let re = regex::Regex::new(pattern).unwrap();
+            if let Some(caps) = re.captures(&html) {
+                let channel_id = caps.get(1).unwrap().as_str();
+                let rss_url = format!("https://www.youtube.com/feeds/videos.xml?channel_id={}", channel_id);
+                println!("Found channel ID: {} -> {}", channel_id, rss_url);
+                return Ok(rss_url);
+            }
+        }
+
+        // Fallback: count UC... occurrences and pick the most frequent one.
+        // The real channel ID appears dozens of times; incidental matches
+        // appear only once or twice.
         let re = regex::Regex::new(r"UC[0-9A-Za-z_-]{22}").unwrap();
-        if let Some(m) = re.find(&html) {
-            let channel_id = m.as_str();
+        let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for m in re.find_iter(&html) {
+            *counts.entry(m.as_str()).or_insert(0) += 1;
+        }
+        if let Some((channel_id, _)) = counts.into_iter().max_by_key(|(_, c)| *c) {
             let rss_url = format!("https://www.youtube.com/feeds/videos.xml?channel_id={}", channel_id);
-            println!("Found channel ID: {} -> {}", channel_id, rss_url);
+            println!("Found channel ID (most frequent): {} -> {}", channel_id, rss_url);
             return Ok(rss_url);
         }
 
@@ -415,6 +441,18 @@ mod tests {
         assert!(result.is_some(), "expected avatar URL, got None");
         let url = result.unwrap();
         assert!(url.starts_with("https://yt3.googleusercontent.com/"), "unexpected URL: {}", url);
+    }
+
+    #[tokio::test]
+    #[ignore = "makes a live network request"]
+    async fn youtube_handle_url_resolved() {
+        let parser = FeedParser::new();
+        let result = parser.convert_youtube_to_rss("https://www.youtube.com/@MostlyTechnical").await;
+        println!("resolve result: {:?}", result);
+        assert!(result.is_ok(), "expected Ok, got Err: {:?}", result);
+        let rss_url = result.unwrap();
+        assert!(rss_url.starts_with("https://www.youtube.com/feeds/videos.xml?channel_id=UC"), "unexpected URL: {}", rss_url);
+        println!("Final RSS URL: {}", rss_url);
     }
 
     // ── convert_youtube_to_rss ─────────────────────────────────────────────

@@ -74,6 +74,9 @@ pub struct Feed {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub is_active: bool,
+    /// Archived feeds are hidden from the active feed list but their data is
+    /// preserved so the user can restore them later.
+    pub is_archived: bool,
     /// Foreign key into the folders table; NULL means ungrouped.
     pub folder_id: Option<String>,
     /// Most recent article published_at across all articles for this feed.

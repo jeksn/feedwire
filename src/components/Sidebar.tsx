@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus, RefreshCw, Rss, Bookmark, Inbox, Settings, Sun,
   ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X, Eye,
-  CheckCheck, Trash2, Link2,
+  CheckCheck, Trash2, Link2, Archive,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import type { Feed, Folder } from '../types';
@@ -130,10 +130,12 @@ interface SidebarProps {
   onSettingsSelect: () => void;
   onAddFeed: () => void;
   onRefreshAll: () => void;
+  onOpenArchive: () => void;
   onFeedsChanged: () => void; // called after folder assignment so App re-fetches
   onMarkFeedAllRead: (feedId: string) => void;
   onRefreshFeed: (feedId: string) => void;
   onCopyUrl: (url: string) => void;
+  onArchiveFeed: (feedId: string) => void;
   onDeleteFeed: (feedId: string) => void;
   loading: boolean;
 }
@@ -151,10 +153,12 @@ export function Sidebar({
   onSettingsSelect,
   onAddFeed,
   onRefreshAll,
+  onOpenArchive,
   onFeedsChanged,
   onMarkFeedAllRead,
   onRefreshFeed,
   onCopyUrl,
+  onArchiveFeed,
   onDeleteFeed,
   loading,
 }: SidebarProps) {
@@ -298,7 +302,13 @@ export function Sidebar({
     <div className="sidebar">
       <div className="sidebar-header">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold">FeedWire</h1>
+          <button
+            className="btn btn-icon btn-primary"
+            onClick={onAddFeed}
+            title="Add feed"
+          >
+            <Plus size={16} />
+          </button>
           <div className="flex gap-xs">
             <button
               className="btn btn-icon btn-ghost"
@@ -309,11 +319,11 @@ export function Sidebar({
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
             <button
-              className="btn btn-icon btn-primary"
-              onClick={onAddFeed}
-              title="Add feed"
+              className="btn btn-icon btn-ghost"
+              onClick={onOpenArchive}
+              title="Archived feeds"
             >
-              <Plus size={16} />
+              <Archive size={16} />
             </button>
           </div>
         </div>
@@ -586,6 +596,7 @@ export function Sidebar({
           onMarkAllRead={onMarkFeedAllRead}
           onRefresh={onRefreshFeed}
           onCopyUrl={onCopyUrl}
+          onArchive={onArchiveFeed}
           onDelete={onDeleteFeed}
         />
       )}
@@ -673,12 +684,13 @@ interface FeedContextMenuProps {
   onMarkAllRead: (feedId: string) => void;
   onRefresh: (feedId: string) => void;
   onCopyUrl: (url: string) => void;
+  onArchive: (feedId: string) => void;
   onDelete: (feedId: string) => void;
 }
 
 const FeedContextMenu = ({
   feed, x, y, folders, onClose, onFolderCreated, onFeedsChanged, onMarkAllRead,
-  onRefresh, onCopyUrl, onDelete,
+  onRefresh, onCopyUrl, onArchive, onDelete,
 }: FeedContextMenuProps) => {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -816,6 +828,15 @@ const FeedContextMenu = ({
           <button className="context-menu-item" onClick={() => setCreatingFolder(true)}>
             <Plus size={12} />
             New folder…
+          </button>
+
+          <div className="context-menu-divider" />
+          <button
+            className="context-menu-item"
+            onClick={() => { onArchive(feed.id); onClose(); }}
+          >
+            <Archive size={12} />
+            Archive feed
           </button>
 
           <div className="context-menu-divider" />

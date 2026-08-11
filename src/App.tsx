@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ArticleList } from "./components/ArticleList";
 import { ContentPane } from "./components/ContentPane";
 import { AddFeedDialog } from "./components/AddFeedDialog";
+import { ArchiveDialog } from "./components/ArchiveDialog";
 import { SettingsPane } from "./components/SettingsPane";
 import { feedApi } from "./api/feed";
 import { useTheme } from "./hooks/useTheme";
@@ -20,6 +21,7 @@ function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedView, setSelectedView] = useState<View>('today');
   const [showAddFeedDialog, setShowAddFeedDialog] = useState(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [bookmarkCount, setBookmarkCount] = useState(0);
@@ -356,6 +358,30 @@ function App() {
     }
   };
 
+  const handleArchiveFeed = async (feedId: string) => {
+    try {
+      await feedApi.archiveFeed(feedId);
+      setFeeds(prev => prev.filter(f => f.id !== feedId));
+      setUnreadCounts(prev => {
+        const next = { ...prev };
+        delete next[feedId];
+        return next;
+      });
+      setArticles(prev => prev.filter(article => article.feed_id !== feedId));
+      if (selectedArticle?.feed_id === feedId) {
+        setSelectedArticle(null);
+      }
+      if (selectedFeed?.id === feedId) {
+        setSelectedFeed(null);
+        setSelectedView('today');
+        loadToday();
+      }
+      await loadBookmarkCount();
+    } catch (error) {
+      console.error("Failed to archive feed:", error);
+    }
+  };
+
   const handleRefreshFeed = async (feedId: string) => {
     try {
       setLoading(true);
@@ -487,11 +513,13 @@ function App() {
         onSettingsSelect={handleSettingsSelect}
         onAddFeed={() => setShowAddFeedDialog(true)}
         onRefreshAll={handleRefreshAll}
+        onOpenArchive={() => setShowArchiveDialog(true)}
         onFeedsChanged={loadFeeds}
         bookmarkCount={bookmarkCount}
         onMarkFeedAllRead={handleMarkFeedAllRead}
         onRefreshFeed={handleRefreshFeed}
         onCopyUrl={handleCopyUrl}
+        onArchiveFeed={handleArchiveFeed}
         onDeleteFeed={handleDeleteFeed}
         loading={loading}
       />
@@ -536,6 +564,13 @@ function App() {
         <AddFeedDialog
           onClose={() => setShowAddFeedDialog(false)}
           onAddFeed={handleAddFeed}
+        />
+      )}
+
+      {showArchiveDialog && (
+        <ArchiveDialog
+          onClose={() => setShowArchiveDialog(false)}
+          onRestored={loadFeeds}
         />
       )}
 

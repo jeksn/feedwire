@@ -737,6 +737,73 @@ body {
   justify-content: flex-end;
 }
 
+/* Add feed dialog — supported formats */
+.add-feed-supported {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.add-feed-supported-label {
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: var(--spacing-xxs);
+}
+
+.add-feed-supported-tag {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background-color: var(--macos-bg-secondary);
+  color: var(--macos-text-secondary);
+  border: 1px solid var(--macos-border-light);
+}
+
+/* Archive dialog */
+.archive-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.archive-feed-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--macos-border-light);
+}
+
+.archive-feed-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.archive-feed-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.archive-feed-title {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--macos-text-primary);
+}
+
+.archive-feed-url {
+  font-size: var(--font-size-xs);
+  color: var(--macos-text-tertiary);
+}
+
 .text-error {
   color: var(--macos-error);
 }
