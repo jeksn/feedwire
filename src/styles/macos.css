@@ -79,6 +79,18 @@
   box-sizing: border-box;
 }
 
+/* Lock the app window: no document scrolling, no rubber-band bounce */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#root {
+  height: 100%;
+}
+
 body {
   font-family: var(--font-system);
   font-size: var(--font-size-base);
@@ -221,7 +233,7 @@ body {
 /* Layout Components */
 .app-container {
   display: flex;
-  height: 100vh;
+  height: 100%;
   background-color: var(--macos-bg-underlay);
 }
 
