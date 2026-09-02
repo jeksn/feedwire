@@ -31,14 +31,14 @@ pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<crate::db::
     })?;
     
     // Check if it's a YouTube channel and convert to RSS
-    let final_url = if parser.is_youtube_channel(&url).await {
+    let (final_url, yt_title) = if parser.is_youtube_channel(&url).await {
         println!("Detected YouTube channel, converting to RSS");
         parser.convert_youtube_to_rss(&url).await.map_err(|e| {
             println!("YouTube conversion failed: {}", e);
             e.to_string()
         })?
     } else {
-        url.clone()
+        (url.clone(), None)
     };
     
     println!("Final URL to fetch: {}", final_url);
@@ -54,11 +54,22 @@ pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<crate::db::
         }
     }
 
-    // Discover feed metadata — no lock held during the network call
-    let new_feed = parser.discover_feed(&final_url).await.map_err(|e| {
-        println!("Feed discovery failed: {}", e);
-        e.to_string()
-    })?;
+    // Discover feed metadata — no lock held during the network call.
+    // YouTube's RSS endpoint intermittently 404s for valid channels; in that
+    // case save the subscription with best-effort metadata (title + avatar
+    // scraped from the channel page) and let auto-refresh backfill articles
+    // once the endpoint is reachable again.
+    let new_feed = match parser.discover_feed(&final_url).await {
+        Ok(f) => f,
+        Err(e) if final_url.contains("youtube.com/feeds") => {
+            println!("Feed discovery failed for YouTube feed ({}), saving with fallback metadata", e);
+            parser.fallback_youtube_feed(&final_url, yt_title).await
+        }
+        Err(e) => {
+            println!("Feed discovery failed: {}", e);
+            return Err(e.to_string());
+        }
+    };
     println!("Feed discovered: {}", new_feed.title);
 
     // Persist — reactivates soft-deleted rows, inserts new ones
@@ -470,7 +481,8 @@ pub async fn delete_filter_rule(rule_id: String, db: State<'_, DbState>) -> Resu
 
 const SETTING_AUTO_REFRESH_INTERVAL: &str = "auto_refresh_interval_minutes";
 
-/// Returns the configured auto-refresh interval in minutes, or 0 if disabled.
+/// Returns the configured auto-refresh interval in minutes.
+/// Unset defaults to 30; an explicit 0 disables background refresh.
 #[tauri::command]
 pub async fn get_auto_refresh_interval(db: State<'_, DbState>) -> Result<u64, String> {
     let db_guard = db.lock().await;
@@ -479,7 +491,7 @@ pub async fn get_auto_refresh_interval(db: State<'_, DbState>) -> Result<u64, St
         .await
         .map_err(|e| e.to_string())?
         .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0);
+        .unwrap_or(30);
     Ok(val)
 }
 
@@ -597,7 +609,7 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
         }
 
         // Validate and try to discover the feed
-        let final_url = if parser.is_youtube_channel(&opml_feed.url).await {
+        let (final_url, yt_title) = if parser.is_youtube_channel(&opml_feed.url).await {
             match parser.convert_youtube_to_rss(&opml_feed.url).await {
                 Ok(u) => u,
                 Err(e) => {
@@ -611,12 +623,20 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
                 }
             }
         } else {
-            opml_feed.url.clone()
+            (opml_feed.url.clone(), None)
         };
 
-        // Discover feed metadata — no lock held during network I/O
+        // Discover feed metadata — no lock held during network I/O.
+        // YouTube feeds are saved with fallback metadata when the RSS
+        // endpoint is unreachable (intermittent 404s); auto-refresh
+        // backfills articles later.
         let new_feed = match parser.discover_feed(&final_url).await {
             Ok(f) => f,
+            Err(e) if final_url.contains("youtube.com/feeds") => {
+                println!("OPML import: discovery failed for {} ({}), saving with fallback metadata", final_url, e);
+                let title_hint = if opml_feed.title.trim().is_empty() { yt_title } else { Some(opml_feed.title.clone()) };
+                parser.fallback_youtube_feed(&final_url, title_hint).await
+            }
             Err(e) => {
                 eprintln!("OPML import: discovery failed for {}: {}", final_url, e);
                 failed.push(FailedFeed {

@@ -95,7 +95,9 @@ pub fn run() {
                     loop {
                         tokio::time::sleep(tick).await;
 
-                        // Read current interval setting
+                        // Read current interval setting. Unset defaults to 30 min
+                        // so feeds keep retrying (external feeds like YouTube's
+                        // RSS endpoint fail intermittently); 0 explicitly disables.
                         let interval_minutes: u64 = {
                             let guard = db_for_timer.lock().await;
                             guard
@@ -104,7 +106,7 @@ pub fn run() {
                                 .ok()
                                 .flatten()
                                 .and_then(|v| v.parse().ok())
-                                .unwrap_or(0)
+                                .unwrap_or(30)
                         };
 
                         if interval_minutes == 0 {

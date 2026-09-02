@@ -57,6 +57,8 @@ fn favicon_url(feed_url: &str) -> Option<String> {
 pub enum FeedError {
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("HTTP {0} from server")]
+    Status(reqwest::StatusCode),
     #[error("Parse error: {0}")]
     Parse(String),
     #[error("Invalid URL: {0}")]
@@ -73,8 +75,12 @@ impl FeedParser {
     pub fn new() -> Self {
         Self {
             client: Client::builder()
-                .user_agent("FeedWire/0.1.0 (RSS Reader)")
+                // Browser-like UA: some servers (notably YouTube's RSS endpoint,
+                // which intermittently 404s non-browser clients) filter requests
+                // by user agent.
+                .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
                 .gzip(true)
+                .timeout(std::time::Duration::from_secs(20))
                 .build()
                 .unwrap_or_default(),
         }
@@ -82,6 +88,9 @@ impl FeedParser {
 
     pub async fn discover_feed(&self, url: &str) -> Result<NewFeed, FeedError> {
         let response = self.client.get(url).send().await?;
+        if !response.status().is_success() {
+            return Err(FeedError::Status(response.status()));
+        }
         let content = response.text().await?;
 
         let parsed_feed = parser::parse(content.as_bytes())
@@ -105,7 +114,36 @@ impl FeedParser {
     }
 
     pub async fn fetch_feed(&self, url: &str) -> Result<(NewFeed, Vec<NewArticle>), FeedError> {
-        let response = self.client.get(url).send().await?;
+        // Transient failures are common in the wild (YouTube's RSS endpoint
+        // returns 404 to everyone during certain UTC morning windows, servers
+        // blip, etc.) — retry with a short backoff before giving up.
+        let mut last_err: Option<FeedError> = None;
+        for attempt in 0..3u32 {
+            if attempt > 0 {
+                tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
+            }
+            match self.fetch_feed_once(url).await {
+                Ok(result) => return Ok(result),
+                Err(e) => last_err = Some(e),
+            }
+        }
+        Err(last_err.expect("retry loop ran at least once"))
+    }
+
+    async fn fetch_feed_once(&self, url: &str) -> Result<(NewFeed, Vec<NewArticle>), FeedError> {
+        let response = self
+            .client
+            .get(url)
+            .header(
+                "Accept",
+                "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html, */*",
+            )
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            return Err(FeedError::Status(response.status()));
+        }
         let content = response.text().await?;
 
         let parsed_feed = parser::parse(content.as_bytes())
@@ -261,7 +299,10 @@ impl FeedParser {
         false
     }
 
-    pub async fn convert_youtube_to_rss(&self, url: &str) -> Result<String, FeedError> {
+    /// Convert a YouTube channel URL into its RSS feed URL.
+    /// Returns `(rss_url, title_hint)` — the title hint comes from the
+    /// channel page scrape and is used when feed metadata can't be fetched.
+    pub async fn convert_youtube_to_rss(&self, url: &str) -> Result<(String, Option<String>), FeedError> {
         let parsed_url = Url::parse(url)?;
 
         if let Some(domain) = parsed_url.domain() {
@@ -270,7 +311,7 @@ impl FeedParser {
                 // Handles: /feeds/videos.xml?channel_id=... and /feeds/videos.xml?user=...
                 if parsed_url.path().starts_with("/feeds/") {
                     println!("URL is already a YouTube RSS feed: {}", url);
-                    return Ok(url.to_string());
+                    return Ok((url.to_string(), None));
                 }
 
                 if let Some(path) = parsed_url.path_segments() {
@@ -281,7 +322,7 @@ impl FeedParser {
                             if let Some(channel_id) = path_segments.get(i + 1) {
                                 let rss_url = format!("https://www.youtube.com/feeds/videos.xml?channel_id={}", channel_id);
                                 println!("Converted YouTube channel URL to RSS: {}", rss_url);
-                                return Ok(rss_url);
+                                return Ok((rss_url, None));
                             }
                         } else if segment.starts_with("@") {
                             let username = segment.trim_start_matches('@');
@@ -300,7 +341,7 @@ impl FeedParser {
                     if key == "channel_id" && !val.is_empty() {
                         let rss_url = format!("https://www.youtube.com/feeds/videos.xml?channel_id={}", val);
                         println!("Converted YouTube channel_id query param to RSS: {}", rss_url);
-                        return Ok(rss_url);
+                        return Ok((rss_url, None));
                     }
                 }
             }
@@ -309,7 +350,7 @@ impl FeedParser {
         Err(FeedError::Parse("Not a valid YouTube channel URL. Please use the format: https://www.youtube.com/channel/CHANNEL_ID".to_string()))
     }
 
-    async fn resolve_youtube_custom_url(&self, custom_name: &str) -> Result<String, FeedError> {
+    async fn resolve_youtube_custom_url(&self, custom_name: &str) -> Result<(String, Option<String>), FeedError> {
         println!("Attempting to resolve YouTube custom URL: @{}", custom_name);
 
         // Method 1: Try the ?user= parameter (works for some older channels)
@@ -319,7 +360,7 @@ impl FeedParser {
                 let body = resp.text().await.unwrap_or_default();
                 if body.contains("<feed") || body.contains("<rss") {
                     println!("Resolved via ?user= parameter");
-                    return Ok(user_rss);
+                    return Ok((user_rss, None));
                 }
             }
         }
@@ -339,6 +380,13 @@ impl FeedParser {
         let html = response.text().await?;
         println!("Got {} bytes from channel page", html.len());
 
+        // Channel display name — used as a title hint if feed metadata
+        // can't be fetched later (e.g. YouTube's RSS endpoint is down).
+        let title_hint = regex::Regex::new(r#"<meta property="og:title" content="([^"]+)""#)
+            .ok()
+            .and_then(|re| re.captures(&html))
+            .map(|c| c[1].replace("&amp;", "&").replace("&quot;", "\""));
+
         // The channel page contains many UC... strings, but the real channel
         // ID appears in specific contexts. Prefer these anchored patterns in
         // order of reliability; fall back to the most frequent UC... match.
@@ -356,7 +404,7 @@ impl FeedParser {
                 let channel_id = caps.get(1).unwrap().as_str();
                 let rss_url = format!("https://www.youtube.com/feeds/videos.xml?channel_id={}", channel_id);
                 println!("Found channel ID: {} -> {}", channel_id, rss_url);
-                return Ok(rss_url);
+                return Ok((rss_url, title_hint));
             }
         }
 
@@ -371,13 +419,32 @@ impl FeedParser {
         if let Some((channel_id, _)) = counts.into_iter().max_by_key(|(_, c)| *c) {
             let rss_url = format!("https://www.youtube.com/feeds/videos.xml?channel_id={}", channel_id);
             println!("Found channel ID (most frequent): {} -> {}", channel_id, rss_url);
-            return Ok(rss_url);
+            return Ok((rss_url, title_hint));
         }
 
         Err(FeedError::Parse(format!(
             "Could not resolve YouTube channel @{}. Try using the direct channel URL: https://www.youtube.com/channel/CHANNEL_ID",
             custom_name
         )))
+    }
+
+    /// Best-effort feed metadata for when the RSS endpoint is unreachable
+    /// (e.g. YouTube's intermittent 404 windows): scrape the channel avatar
+    /// and use the title hint so the subscription can still be saved.
+    /// Articles are backfilled by the next successful refresh.
+    pub async fn fallback_youtube_feed(&self, rss_url: &str, title_hint: Option<String>) -> NewFeed {
+        let channel_id = youtube_channel_id_from_feed_url(rss_url);
+        let icon_url = match &channel_id {
+            Some(id) => self.fetch_youtube_avatar(id).await.or_else(|| favicon_url(rss_url)),
+            None => favicon_url(rss_url),
+        };
+        NewFeed {
+            title: title_hint.unwrap_or_else(|| "YouTube channel".to_string()),
+            url: rss_url.to_string(),
+            description: None,
+            feed_type: "atom".to_string(),
+            icon_url,
+        }
     }
 
     pub fn validate_feed_url(url: &str) -> Result<(), FeedError> {
@@ -450,9 +517,9 @@ mod tests {
         let result = parser.convert_youtube_to_rss("https://www.youtube.com/@MostlyTechnical").await;
         println!("resolve result: {:?}", result);
         assert!(result.is_ok(), "expected Ok, got Err: {:?}", result);
-        let rss_url = result.unwrap();
+        let (rss_url, title) = result.unwrap();
         assert!(rss_url.starts_with("https://www.youtube.com/feeds/videos.xml?channel_id=UC"), "unexpected URL: {}", rss_url);
-        println!("Final RSS URL: {}", rss_url);
+        println!("Final RSS URL: {} (title hint: {:?})", rss_url, title);
     }
 
     // ── convert_youtube_to_rss ─────────────────────────────────────────────
@@ -461,19 +528,21 @@ mod tests {
     async fn already_rss_url_passthrough() {
         let parser = FeedParser::new();
         let url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx";
-        let result = parser.convert_youtube_to_rss(url).await.unwrap();
+        let (result, title) = parser.convert_youtube_to_rss(url).await.unwrap();
         assert_eq!(result, url);
+        assert!(title.is_none());
     }
 
     #[tokio::test]
     async fn channel_path_converted() {
         let parser = FeedParser::new();
         let url = "https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx";
-        let result = parser.convert_youtube_to_rss(url).await.unwrap();
+        let (result, title) = parser.convert_youtube_to_rss(url).await.unwrap();
         assert_eq!(
             result,
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx"
         );
+        assert!(title.is_none());
     }
 
     #[tokio::test]
