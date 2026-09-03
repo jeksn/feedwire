@@ -2,13 +2,14 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus, RefreshCw, Rss, Bookmark, Inbox, Settings, Sun,
   ArrowUpDown, ChevronRight, Folder as FolderIcon, Search, X, Eye,
-  CheckCheck, Trash2, Link2, Archive,
+  CheckCheck, Trash2, Link2, Archive, Download,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import type { Feed, Folder } from '../types';
 import { feedApi } from '../api/feed';
 import { FeedAvatar } from './FeedAvatar';
 import { useContextMenuPosition } from '../hooks/useContextMenuPosition';
+import type { UpdateStatus } from '../hooks/useUpdater';
 
 interface RefreshProgress {
   done: number;
@@ -138,6 +139,9 @@ interface SidebarProps {
   onArchiveFeed: (feedId: string) => void;
   onDeleteFeed: (feedId: string) => void;
   loading: boolean;
+  updateStatus?: UpdateStatus;
+  updateProgress?: number | null;
+  onInstallUpdate?: () => void;
 }
 
 export function Sidebar({
@@ -161,6 +165,9 @@ export function Sidebar({
   onArchiveFeed,
   onDeleteFeed,
   loading,
+  updateStatus,
+  updateProgress,
+  onInstallUpdate,
 }: SidebarProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>(loadSortOrder);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
@@ -560,6 +567,18 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-footer">
+        {updateStatus === 'available' && (
+          <button
+            className="update-pill"
+            onClick={onInstallUpdate}
+            title="Download and install the update"
+          >
+            <Download size={12} />
+            {updateProgress != null && updateProgress > 0
+              ? `Updating… ${updateProgress}%`
+              : 'Update available — restart to update'}
+          </button>
+        )}
         {progress && (
           <div className={`sidebar-status${progress.done === progress.total ? ' sidebar-status--done' : ''}`}>
             {progress.done < progress.total && <RefreshCw size={11} className="animate-spin" />}

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Upload, Download, CheckCircle, AlertCircle, Loader, Sun, Moon, Monitor, ChevronDown, ChevronUp, Trash2, Plus, X, RefreshCw } from 'lucide-react';
+import { getVersion } from '@tauri-apps/api/app';
 import type { ThemePreference } from '../hooks/useTheme';
+import type { UpdateStatus } from '../hooks/useUpdater';
 import type { ImportResult } from '../api/feed';
 import { feedApi } from '../api/feed';
 import type { FilterRule, FilterField, FilterSettings } from '../types';
@@ -12,6 +14,10 @@ interface SettingsPaneProps {
   onDeleteAll: () => Promise<number>;
   theme: ThemePreference;
   onThemeChange: (t: ThemePreference) => void;
+  updateStatus?: UpdateStatus;
+  updateProgress?: number | null;
+  onCheckForUpdates?: () => Promise<boolean>;
+  onInstallUpdate?: () => void;
 }
 
 type ImportStatus =
@@ -28,10 +34,15 @@ type ExportStatus =
 
 type DeleteAllStatus = { type: 'idle' } | { type: 'confirm' } | { type: 'loading' } | { type: 'done'; count: number };
 
-export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme, onThemeChange }: SettingsPaneProps) {
+export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme, onThemeChange, updateStatus = 'idle', updateProgress, onCheckForUpdates, onInstallUpdate }: SettingsPaneProps) {
   const [importStatus, setImportStatus] = useState<ImportStatus>({ type: 'idle' });
   const [exportStatus, setExportStatus] = useState<ExportStatus>({ type: 'idle' });
   const [deleteAllStatus, setDeleteAllStatus] = useState<DeleteAllStatus>({ type: 'idle' });
+  const [appVersion, setAppVersion] = useState('…');
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion('dev'));
+  }, []);
 
   const handleImport = async () => {
     setImportStatus({ type: 'loading' });
@@ -116,6 +127,14 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
 
         {/* Auto-refresh section */}
         <AutoRefreshSection />
+
+        {/* Updates section */}
+        <UpdatesSection
+          status={updateStatus}
+          progress={updateProgress}
+          onCheck={onCheckForUpdates}
+          onInstall={onInstallUpdate}
+        />
 
         {/* Import / Export section */}
         <section className="settings-section">
@@ -242,7 +261,7 @@ export function SettingsPane({ feedCount, onImport, onExport, onDeleteAll, theme
           <h3 className="settings-section-title">About</h3>
           <div className="settings-about">
             <p className="text-sm text-secondary">FeedWire — a minimal RSS reader</p>
-            <p className="text-xs text-secondary" style={{ marginTop: 4 }}>Version 0.1.0</p>
+            <p className="text-xs text-secondary" style={{ marginTop: 4 }}>Version {appVersion}</p>
           </div>
         </section>
       </div>
@@ -397,6 +416,78 @@ function AutoRefreshSection() {
           )}
         </div>
       </div>
+    </section>
+  );
+}
+
+// ── Updates Section ───────────────────────────────────────────────────────────
+
+function UpdatesSection({
+  status,
+  progress,
+  onCheck,
+  onInstall,
+}: {
+  status: UpdateStatus;
+  progress?: number | null;
+  onCheck?: () => Promise<boolean>;
+  onInstall?: () => void;
+}) {
+  const installing = status === 'downloading';
+  return (
+    <section className="settings-section">
+      <h3 className="settings-section-title">Updates</h3>
+      <p className="settings-section-description">
+        FeedWire checks GitHub for new releases automatically and can update
+        itself in place — no manual downloads needed.
+      </p>
+
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <Download size={14} className="text-accent" />
+          <span>Software update</span>
+        </div>
+        <div className="settings-row-control">
+          {status === 'available' || installing ? (
+            <button
+              className="btn btn-primary"
+              onClick={onInstall}
+              disabled={installing}
+            >
+              {installing
+                ? `Downloading… ${progress ?? 0}%`
+                : 'Download & install'}
+            </button>
+          ) : (
+            <button
+              className="btn btn-secondary"
+              onClick={() => onCheck?.()}
+              disabled={status === 'checking'}
+            >
+              {status === 'checking' ? 'Checking…' : 'Check for updates'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {status === 'up-to-date' && (
+        <div className="settings-status settings-status-success">
+          <CheckCircle size={12} />
+          You're on the latest version.
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="settings-status settings-status-error">
+          <AlertCircle size={12} />
+          Couldn't check for updates — check your internet connection.
+        </div>
+      )}
+      {installing && (
+        <div className="settings-status">
+          <Loader size={12} className="animate-spin" />
+          Downloading the update… the app restarts automatically when done.
+        </div>
+      )}
     </section>
   );
 }

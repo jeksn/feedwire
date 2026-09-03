@@ -938,6 +938,31 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Update pill (sidebar footer) ── */
+.update-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 16px);
+  margin: 2px 8px 6px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--macos-accent) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--macos-selection);
+  color: var(--macos-accent);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  font-family: var(--font-system);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+  animation: sidebar-status-in 0.15s ease;
+}
+
+.update-pill:hover {
+  background: color-mix(in srgb, var(--macos-accent) 22%, transparent);
+}
+
 /* ── Sidebar status bar ── */
 .sidebar-status {
   display: flex;
@@ -968,7 +993,7 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  width: auto;
+  width: calc(100% - 16px);
   margin: 2px 8px;
   padding: 6px 12px;
   background: none;
