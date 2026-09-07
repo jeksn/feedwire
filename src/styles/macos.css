@@ -529,7 +529,14 @@ body {
   color: var(--macos-text-secondary);
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  gap: 4px var(--spacing-md);
+}
+
+/* Each meta chip (icon + label) wraps as a whole unit instead of
+   breaking its text across lines when the pane gets narrow. */
+.content-meta > div {
+  white-space: nowrap;
 }
 
 .content-body {
@@ -540,9 +547,20 @@ body {
 }
 
 .content-body img {
-  max-width: 100%;
+  display: block;
+  max-width: min(100%, 800px);
   height: auto;
   border-radius: var(--radius-md);
+}
+
+/* Feed HTML often wraps images in fixed-width caption containers
+   (e.g. WordPress `<div style="width: 610px">`) — let them shrink to
+   the column so the image inside scales down instead of overflowing. */
+.content-body figure,
+.content-body .wp-caption,
+.content-body div[style*="width"],
+.content-body table[style*="width"] {
+  max-width: 100% !important;
 }
 
 .content-body a {
