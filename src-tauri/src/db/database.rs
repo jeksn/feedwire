@@ -535,13 +535,19 @@ impl Database {
         self.get_article_by_id(id).await
     }
 
-    pub async fn get_bookmarked_articles(&self) -> Result<Vec<Article>, DatabaseError> {
-        let articles = sqlx::query_as::<_, Article>(
+    pub async fn get_bookmarked_articles(&self, feed_id: Option<&str>) -> Result<Vec<Article>, DatabaseError> {
+        let query = if feed_id.is_some() {
+            "SELECT * FROM articles WHERE is_bookmarked = 1 AND feed_id = ? ORDER BY published_at DESC, created_at DESC"
+        } else {
             "SELECT * FROM articles WHERE is_bookmarked = 1 ORDER BY published_at DESC, created_at DESC"
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        };
 
+        let mut query_builder = sqlx::query_as::<_, Article>(query);
+        if let Some(id) = feed_id {
+            query_builder = query_builder.bind(id);
+        }
+
+        let articles = query_builder.fetch_all(&self.pool).await?;
         Ok(articles)
     }
 
@@ -550,6 +556,16 @@ impl Database {
             .fetch_one(&self.pool)
             .await?;
         Ok(count)
+    }
+
+    /// Bookmark count per feed, for feeds that have at least one bookmark.
+    pub async fn get_bookmark_counts(&self) -> Result<std::collections::HashMap<String, i64>, DatabaseError> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT feed_id, COUNT(*) FROM articles WHERE is_bookmarked = 1 GROUP BY feed_id"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().collect())
     }
 
     pub async fn mark_all_read(&self, feed_id: Option<&str>) -> Result<(), DatabaseError> {

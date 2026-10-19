@@ -177,9 +177,9 @@ pub async fn toggle_bookmark(article_id: String, db: State<'_, DbState>) -> Resu
 }
 
 #[tauri::command]
-pub async fn get_bookmarked_articles(db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
+pub async fn get_bookmarked_articles(feed_id: Option<String>, db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
     let db = db.lock().await;
-    let articles = db.get_bookmarked_articles().await.map_err(|e| e.to_string())?;
+    let articles = db.get_bookmarked_articles(feed_id.as_deref()).await.map_err(|e| e.to_string())?;
     Ok(articles)
 }
 
@@ -188,6 +188,13 @@ pub async fn get_bookmark_count(db: State<'_, DbState>) -> Result<i64, String> {
     let db = db.lock().await;
     let count = db.get_bookmark_count().await.map_err(|e| e.to_string())?;
     Ok(count)
+}
+
+#[tauri::command]
+pub async fn get_bookmark_counts(db: State<'_, DbState>) -> Result<std::collections::HashMap<String, i64>, String> {
+    let db = db.lock().await;
+    let counts = db.get_bookmark_counts().await.map_err(|e| e.to_string())?;
+    Ok(counts)
 }
 
 #[tauri::command]

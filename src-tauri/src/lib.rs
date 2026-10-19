@@ -145,6 +145,7 @@ pub fn run() {
             db::commands::toggle_bookmark,
             db::commands::get_bookmarked_articles,
             db::commands::get_bookmark_count,
+            db::commands::get_bookmark_counts,
             db::commands::get_unread_articles,
             db::commands::get_today_articles,
             db::commands::mark_all_read,

@@ -76,12 +76,17 @@ export const feedApi = {
     return await invoke('toggle_bookmark', { articleId });
   },
 
-  getBookmarkedArticles: async (): Promise<Article[]> => {
-    return await invoke('get_bookmarked_articles');
+  getBookmarkedArticles: async (feedId?: string): Promise<Article[]> => {
+    return await invoke('get_bookmarked_articles', { feedId });
   },
 
   getBookmarkCount: async (): Promise<number> => {
     return await invoke('get_bookmark_count');
+  },
+
+  /** Bookmark count per feed id, only including feeds with at least one bookmark. */
+  getBookmarkCounts: async (): Promise<Record<string, number>> => {
+    return await invoke('get_bookmark_counts');
   },
 
   getUnreadArticles: async (): Promise<Article[]> => {

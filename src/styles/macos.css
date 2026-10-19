@@ -553,13 +553,27 @@ body {
   border-radius: var(--radius-md);
 }
 
+/* Embedded media (YouTube embeds, players) scales with the column too —
+   their width/height attributes are overridden by max-width + height:auto. */
+.content-body iframe,
+.content-body video,
+.content-body embed,
+.content-body object {
+  display: block;
+  max-width: min(100%, 800px);
+  height: auto;
+  border: none;
+  border-radius: var(--radius-md);
+}
+
 /* Feed HTML often wraps images in fixed-width caption containers
    (e.g. WordPress `<div style="width: 610px">`) — let them shrink to
    the column so the image inside scales down instead of overflowing. */
 .content-body figure,
 .content-body .wp-caption,
 .content-body div[style*="width"],
-.content-body table[style*="width"] {
+.content-body table[style*="width"],
+.content-body iframe[style*="width"] {
   max-width: 100% !important;
 }
 

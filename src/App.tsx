@@ -21,16 +21,17 @@ function App() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedFeed, setSelectedFeed] = useState<Feed | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [selectedView, setSelectedView] = useState<View>('today');
+  const [selectedView, setSelectedView] = useState<View>('unread');
   const [showAddFeedDialog, setShowAddFeedDialog] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [bookmarkCount, setBookmarkCount] = useState(0);
+  const [bookmarkCounts, setBookmarkCounts] = useState<Record<string, number>>({});
 
   // Keep stable refs so event listeners can read current state without
   // needing to be re-registered on every render.
-  const selectedViewRef = useRef<View>('today');
+  const selectedViewRef = useRef<View>('unread');
   const selectedFeedRef = useRef<Feed | null>(null);
   const selectedArticleRef = useRef<Article | null>(null);
   const articlesRef = useRef<Article[]>([]);
@@ -58,16 +59,18 @@ function App() {
 
   useEffect(() => {
     loadFeeds();
-    loadToday();
-    loadBookmarkCount();
+    loadUnread();
+    loadBookmarkCounts();
   }, []);
 
-  const loadBookmarkCount = async () => {
+  // Loads per-feed bookmark counts and derives the global total from them.
+  const loadBookmarkCounts = async () => {
     try {
-      const count = await feedApi.getBookmarkCount();
-      setBookmarkCount(count);
+      const counts = await feedApi.getBookmarkCounts();
+      setBookmarkCounts(counts);
+      setBookmarkCount(Object.values(counts).reduce((sum, n) => sum + n, 0));
     } catch (error) {
-      console.error('Failed to load bookmark count:', error);
+      console.error('Failed to load bookmark counts:', error);
     }
   };
 
@@ -82,7 +85,7 @@ function App() {
         const feed = selectedFeedRef.current;
         if (view === 'today') loadToday();
         else if (view === 'unread') loadUnread();
-        else if (view === 'bookmarks') loadBookmarks();
+        else if (view === 'bookmarks') loadBookmarks(feed?.id);
         else loadArticles(feed?.id);
       }
     });
@@ -162,10 +165,10 @@ function App() {
     }
   };
 
-  const loadBookmarks = async () => {
+  const loadBookmarks = async (feedId?: string) => {
     try {
       setLoading(true);
-      const bookmarked = await feedApi.getBookmarkedArticles();
+      const bookmarked = await feedApi.getBookmarkedArticles(feedId);
       setArticles(bookmarked);
     } catch (error) {
       console.error("Failed to load bookmarks:", error);
@@ -201,8 +204,14 @@ function App() {
   const handleFeedSelect = (feed: Feed) => {
     setSelectedFeed(feed);
     setSelectedArticle(null);
-    setSelectedView('feed');
-    loadArticles(feed.id);
+    // In the Bookmarks route the sidebar lists feeds with bookmarks; picking
+    // one filters the bookmark list to that feed instead of leaving the route.
+    if (selectedView === 'bookmarks') {
+      loadBookmarks(feed.id);
+    } else {
+      setSelectedView('feed');
+      loadArticles(feed.id);
+    }
   };
 
   const handleTodaySelect = () => {
@@ -252,6 +261,7 @@ function App() {
     setSelectedArticle(null);
     pendingBookmarkRemovalId.current = null;
     setUnreadCounts({});
+    setBookmarkCounts({});
     setBookmarkCount(0);
     return count;
   };
@@ -352,9 +362,13 @@ function App() {
       }
       if (selectedFeed?.id === feedId) {
         setSelectedFeed(null);
-        setSelectedView('feed');
+        if (selectedView === 'bookmarks') {
+          loadBookmarks();
+        } else {
+          setSelectedView('feed');
+        }
       }
-      await loadBookmarkCount();
+      await loadBookmarkCounts();
     } catch (error) {
       console.error("Failed to delete feed:", error);
     }
@@ -375,10 +389,14 @@ function App() {
       }
       if (selectedFeed?.id === feedId) {
         setSelectedFeed(null);
-        setSelectedView('today');
-        loadToday();
+        if (selectedView === 'bookmarks') {
+          loadBookmarks();
+        } else {
+          setSelectedView('today');
+          loadToday();
+        }
       }
-      await loadBookmarkCount();
+      await loadBookmarkCounts();
     } catch (error) {
       console.error("Failed to archive feed:", error);
     }
@@ -402,7 +420,7 @@ function App() {
       setLoading(true);
       await feedApi.refreshAllFeeds();
       if (selectedView === 'bookmarks') {
-        loadBookmarks();
+        loadBookmarks(selectedFeed?.id);
       } else if (selectedView === 'unread') {
         loadUnread();
       } else if (selectedView === 'today') {
@@ -484,8 +502,8 @@ function App() {
           setSelectedArticle(updatedArticle);
         }
       }
-      // Keep the sidebar bookmark badge in sync
-      loadBookmarkCount();
+      // Keep the sidebar bookmark badges in sync
+      loadBookmarkCounts();
     } catch (error) {
       console.error("Failed to toggle bookmark:", error);
     }
@@ -496,7 +514,8 @@ function App() {
   toggleBookmarkRef.current = handleToggleBookmark;
   articleSelectRef.current = handleArticleSelect;
 
-  const articleListTitle = selectedView === 'bookmarks' ? 'Bookmarks'
+  const articleListTitle = selectedView === 'bookmarks'
+    ? (selectedFeed ? `Bookmarks — ${selectedFeed.title}` : 'Bookmarks')
     : selectedView === 'unread' ? 'Unread'
     : selectedView === 'today' ? 'Today'
     : undefined;
@@ -518,6 +537,7 @@ function App() {
         onOpenArchive={() => setShowArchiveDialog(true)}
         onFeedsChanged={loadFeeds}
         bookmarkCount={bookmarkCount}
+        bookmarkCounts={bookmarkCounts}
         onMarkFeedAllRead={handleMarkFeedAllRead}
         onRefreshFeed={handleRefreshFeed}
         onCopyUrl={handleCopyUrl}

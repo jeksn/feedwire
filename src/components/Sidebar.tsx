@@ -124,6 +124,8 @@ interface SidebarProps {
   selectedView: 'feed' | 'today' | 'unread' | 'bookmarks' | 'settings';
   unreadCounts: Record<string, number>;
   bookmarkCount: number;
+  /** Bookmark count per feed id (only feeds with bookmarks are listed). */
+  bookmarkCounts: Record<string, number>;
   onFeedSelect: (feed: Feed) => void;
   onTodaySelect: () => void;
   onUnreadSelect: () => void;
@@ -150,6 +152,7 @@ export function Sidebar({
   selectedView,
   unreadCounts,
   bookmarkCount,
+  bookmarkCounts,
   onFeedSelect,
   onTodaySelect,
   onUnreadSelect,
@@ -183,6 +186,25 @@ export function Sidebar({
   const viewMenuRef = useRef<HTMLDivElement>(null);
 
   const totalUnread = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
+  const isBookmarksRoute = selectedView === 'bookmarks';
+
+  // In the Bookmarks route the feed list is replaced by a flat list of feeds
+  // that have at least one bookmarked article, with the bookmark count shown
+  // per feed. Search and feed-source filters still apply.
+  const bookmarkedFeeds = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let list = feeds.filter(f => (bookmarkCounts[f.id] ?? 0) > 0);
+    if (q) list = list.filter(f => f.title.toLowerCase().includes(q));
+    if (viewOptions.feedSource !== 'all') {
+      list = list.filter(f => {
+        const isYouTube = f.url.includes('youtube.com') || f.url.includes('youtu.be');
+        return viewOptions.feedSource === 'youtube' ? isYouTube : !isYouTube;
+      });
+    }
+    // Pass empty counts so the unread-float rule is skipped; all rows here
+    // already have bookmarks, so only the user's sort order applies.
+    return sortFeeds(list, sortOrder, {});
+  }, [feeds, bookmarkCounts, searchQuery, sortOrder, viewOptions.feedSource]);
 
   // Load folders on mount
   useEffect(() => {
@@ -340,9 +362,13 @@ export function Sidebar({
           <span className="text-sm text-secondary">
             {feeds.length} {feeds.length === 1 ? 'feed' : 'feeds'}
           </span>
-          {totalUnread > 0 && (
-            <span className="feed-unread-count">{totalUnread}</span>
-          )}
+          {isBookmarksRoute
+            ? bookmarkCount > 0 && (
+              <span className="feed-count-subtle">{bookmarkCount}</span>
+            )
+            : totalUnread > 0 && (
+              <span className="feed-unread-count">{totalUnread}</span>
+            )}
         </div>
       </div>
 
@@ -504,6 +530,37 @@ export function Sidebar({
               Add Feed
             </button>
           </div>
+        ) : isBookmarksRoute ? (
+          bookmarkedFeeds.length === 0 ? (
+            isSearching ? (
+              <div className="sidebar-search-empty">
+                No feeds match "{searchQuery}"
+              </div>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-icon"><Bookmark size={28} /></div>
+                <div className="empty-state-title">No bookmarks yet</div>
+                <div className="empty-state-description">
+                  Bookmark articles and they will be listed here by feed
+                </div>
+              </div>
+            )
+          ) : (
+            bookmarkedFeeds.map(feed => (
+              <FeedRow
+                key={feed.id}
+                feed={feed}
+                isActive={selectedFeed?.id === feed.id}
+                unreadCount={bookmarkCounts[feed.id] ?? 0}
+                badgeClassName="feed-count-subtle"
+                onSelect={onFeedSelect}
+                onContextMenu={handleContextMenu}
+                indented={false}
+                showAvatar={viewOptions.showAvatar}
+                showTypeBadge={viewOptions.showTypeBadge}
+              />
+            ))
+          )
         ) : isSearching && ungrouped.length === 0 ? (
           <div className="sidebar-search-empty">
             No feeds match "{searchQuery}"
@@ -644,6 +701,8 @@ interface FeedRowProps {
   feed: Feed;
   isActive: boolean;
   unreadCount: number;
+  /** CSS class for the count badge (unread vs. bookmark styling). */
+  badgeClassName?: string;
   onSelect: (feed: Feed) => void;
   onContextMenu: (e: React.MouseEvent, feedId: string) => void;
   indented: boolean;
@@ -671,7 +730,7 @@ function FeedTypeBadge({ feed }: { feed: Feed }) {
   return isYouTube ? <YouTubeIcon /> : <RssIcon />;
 }
 
-function FeedRow({ feed, isActive, unreadCount, onSelect, onContextMenu, indented, showAvatar, showTypeBadge }: FeedRowProps) {
+function FeedRow({ feed, isActive, unreadCount, badgeClassName = 'feed-unread-count', onSelect, onContextMenu, indented, showAvatar, showTypeBadge }: FeedRowProps) {
   return (
     <div
       className={`list-item${isActive ? ' active' : ''}${indented ? ' list-item--indented' : ''}${showAvatar ? ' list-item--with-avatar' : ''}`}
@@ -683,7 +742,7 @@ function FeedRow({ feed, isActive, unreadCount, onSelect, onContextMenu, indente
         <div className="feed-title truncate">{feed.title}</div>
         {showTypeBadge && <FeedTypeBadge feed={feed} />}
         {unreadCount > 0 && (
-          <span className="feed-unread-count">{unreadCount}</span>
+          <span className={badgeClassName}>{unreadCount}</span>
         )}
       </div>
     </div>

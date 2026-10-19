@@ -207,7 +207,7 @@ async fn bookmark_article() {
         ..Default::default()
     }).await.unwrap();
 
-    let bookmarks = db.get_bookmarked_articles().await.unwrap();
+    let bookmarks = db.get_bookmarked_articles(None).await.unwrap();
     assert_eq!(bookmarks.len(), 1);
     assert_eq!(bookmarks[0].id, article.id);
 }
@@ -288,7 +288,7 @@ async fn deleting_feed_removes_its_articles_and_bookmarks() {
 
     assert!(db.get_feeds().await.unwrap().is_empty());
     assert!(db.get_articles(Some(feed.id), None, None).await.unwrap().is_empty());
-    assert!(db.get_bookmarked_articles().await.unwrap().is_empty());
+    assert!(db.get_bookmarked_articles(None).await.unwrap().is_empty());
     assert_eq!(db.get_bookmark_count().await.unwrap(), 0);
 }
 
@@ -310,6 +310,34 @@ async fn deleting_all_feeds_removes_all_articles_and_bookmarks() {
 
     assert!(db.get_feeds().await.unwrap().is_empty());
     assert!(db.get_articles(None, None, None).await.unwrap().is_empty());
-    assert!(db.get_bookmarked_articles().await.unwrap().is_empty());
+    assert!(db.get_bookmarked_articles(None).await.unwrap().is_empty());
     assert_eq!(db.get_bookmark_count().await.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn bookmarked_articles_filter_by_feed_and_counts_per_feed() {
+    let db = test_db().await;
+    let feed_a = db.create_feed(new_feed("A", "https://a.example/rss")).await.unwrap();
+    let feed_b = db.create_feed(new_feed("B", "https://b.example/rss")).await.unwrap();
+    let a1 = db.create_article(new_article(&feed_a.id, "A1", "ga1")).await.unwrap();
+    let a2 = db.create_article(new_article(&feed_a.id, "A2", "ga2")).await.unwrap();
+    let b1 = db.create_article(new_article(&feed_b.id, "B1", "gb1")).await.unwrap();
+    for article in [&a1, &a2, &b1] {
+        db.update_article(&article.id, crate::db::ArticleUpdate {
+            is_bookmarked: Some(true),
+            ..Default::default()
+        }).await.unwrap();
+    }
+
+    let all = db.get_bookmarked_articles(None).await.unwrap();
+    assert_eq!(all.len(), 3);
+
+    let feed_a_bookmarks = db.get_bookmarked_articles(Some(&feed_a.id)).await.unwrap();
+    assert_eq!(feed_a_bookmarks.len(), 2);
+    assert!(feed_a_bookmarks.iter().all(|a| a.feed_id == feed_a.id));
+
+    let counts = db.get_bookmark_counts().await.unwrap();
+    assert_eq!(counts.len(), 2);
+    assert_eq!(counts[&feed_a.id], 2);
+    assert_eq!(counts[&feed_b.id], 1);
 }
