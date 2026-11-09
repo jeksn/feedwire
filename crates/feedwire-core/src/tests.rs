@@ -5,8 +5,8 @@
 ///
 /// Run with: cargo test
 
-use crate::db::{Database, DatabaseError};
-use crate::db::models::{NewFeed, NewArticle};
+use crate::{Database, DatabaseError};
+use crate::models::{NewFeed, NewArticle};
 
 async fn test_db() -> Database {
     Database::with_url("sqlite::memory:").await.expect("in-memory DB failed")
@@ -188,7 +188,7 @@ async fn mark_article_read() {
 
     assert!(!article.is_read);
 
-    let updated = db.update_article(&article.id, crate::db::ArticleUpdate {
+    let updated = db.update_article(&article.id, crate::ArticleUpdate {
         is_read: Some(true),
         ..Default::default()
     }).await.unwrap();
@@ -202,7 +202,7 @@ async fn bookmark_article() {
     let feed = db.create_feed(new_feed("Feed", "https://example.com/rss")).await.unwrap();
     let article = db.create_article(new_article(&feed.id, "Post", "guid-1")).await.unwrap();
 
-    db.update_article(&article.id, crate::db::ArticleUpdate {
+    db.update_article(&article.id, crate::ArticleUpdate {
         is_bookmarked: Some(true),
         ..Default::default()
     }).await.unwrap();
@@ -269,7 +269,7 @@ async fn create_or_reactivate_returns_duplicate_for_active_feed() {
     db.create_feed(new_feed("Feed", "https://example.com/rss")).await.unwrap();
 
     let result = db.create_or_reactivate_feed(new_feed("Feed 2", "https://example.com/rss")).await;
-    assert!(matches!(result, Err(crate::db::DatabaseError::DuplicateUrl)));
+    assert!(matches!(result, Err(crate::DatabaseError::DuplicateUrl)));
 }
 
 // ── Feed deletion ─────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ async fn deleting_feed_removes_its_articles_and_bookmarks() {
     let db = test_db().await;
     let feed = db.create_feed(new_feed("Feed", "https://example.com/rss")).await.unwrap();
     let article = db.create_article(new_article(&feed.id, "Post", "guid-1")).await.unwrap();
-    db.update_article(&article.id, crate::db::ArticleUpdate {
+    db.update_article(&article.id, crate::ArticleUpdate {
         is_bookmarked: Some(true),
         ..Default::default()
     }).await.unwrap();
@@ -300,7 +300,7 @@ async fn deleting_all_feeds_removes_all_articles_and_bookmarks() {
     let article_a = db.create_article(new_article(&feed_a.id, "Post A", "guid-a")).await.unwrap();
     let article_b = db.create_article(new_article(&feed_b.id, "Post B", "guid-b")).await.unwrap();
     for article in [article_a, article_b] {
-        db.update_article(&article.id, crate::db::ArticleUpdate {
+        db.update_article(&article.id, crate::ArticleUpdate {
             is_bookmarked: Some(true),
             ..Default::default()
         }).await.unwrap();
@@ -323,7 +323,7 @@ async fn bookmarked_articles_filter_by_feed_and_counts_per_feed() {
     let a2 = db.create_article(new_article(&feed_a.id, "A2", "ga2")).await.unwrap();
     let b1 = db.create_article(new_article(&feed_b.id, "B1", "gb1")).await.unwrap();
     for article in [&a1, &a2, &b1] {
-        db.update_article(&article.id, crate::db::ArticleUpdate {
+        db.update_article(&article.id, crate::ArticleUpdate {
             is_bookmarked: Some(true),
             ..Default::default()
         }).await.unwrap();

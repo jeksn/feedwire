@@ -1,11 +1,13 @@
-use crate::db::{Database, FeedParser, FeedUpdate, ArticleUpdate};
-use crate::db::filters::should_keep;
-use crate::db::models::{NewFilterRule, Folder};
-use crate::opml;
+use feedwire_core::models::{ArticleUpdate, NewFilterRule, Folder};
+use feedwire_core::opml;
+use feedwire_core::refresh;
+use feedwire_core::{
+    Database, FeedParser, SETTING_AUTO_REFRESH_INTERVAL, SETTING_SKIP_YOUTUBE_SHORTS,
+};
 use tauri::{State, AppHandle, Emitter};
 use tauri_plugin_dialog::DialogExt;
 use std::sync::Arc;
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct RefreshProgress {
@@ -14,12 +16,10 @@ pub struct RefreshProgress {
     pub feed_title: String,
 }
 
-const SETTING_SKIP_YOUTUBE_SHORTS: &str = "skip_youtube_shorts";
-
 pub type DbState = Arc<Mutex<Database>>;
 
 #[tauri::command]
-pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<crate::db::models::Feed, String> {
+pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<feedwire_core::models::Feed, String> {
     println!("Adding feed: {}", url);
     
     let parser = FeedParser::new();
@@ -84,7 +84,7 @@ pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<crate::db::
     };
 
     // Fetch initial articles after the lock is released to avoid deadlock
-    if let Err(e) = fetch_feed_articles(feed.id.clone(), db.inner().clone()).await {
+    if let Err(e) = refresh::fetch_feed_articles(feed.id.clone(), db.inner().clone()).await {
         println!("Failed to fetch initial articles: {}", e);
     }
 
@@ -92,7 +92,7 @@ pub async fn add_feed(url: String, db: State<'_, DbState>) -> Result<crate::db::
 }
 
 #[tauri::command]
-pub async fn get_feeds(db: State<'_, DbState>) -> Result<Vec<crate::db::models::Feed>, String> {
+pub async fn get_feeds(db: State<'_, DbState>) -> Result<Vec<feedwire_core::models::Feed>, String> {
     let db = db.lock().await;
     let feeds = db.get_feeds().await.map_err(|e| e.to_string())?;
     Ok(feeds)
@@ -124,7 +124,7 @@ pub async fn unarchive_feed(feed_id: String, db: State<'_, DbState>) -> Result<(
 }
 
 #[tauri::command]
-pub async fn get_archived_feeds(db: State<'_, DbState>) -> Result<Vec<crate::db::models::Feed>, String> {
+pub async fn get_archived_feeds(db: State<'_, DbState>) -> Result<Vec<feedwire_core::models::Feed>, String> {
     let db = db.lock().await;
     let feeds = db.get_archived_feeds().await.map_err(|e| e.to_string())?;
     Ok(feeds)
@@ -136,21 +136,21 @@ pub async fn get_articles(
     limit: Option<i64>,
     offset: Option<i64>,
     db: State<'_, DbState>
-) -> Result<Vec<crate::db::models::Article>, String> {
+) -> Result<Vec<feedwire_core::models::Article>, String> {
     let db = db.lock().await;
     let articles = db.get_articles(feed_id, limit, offset).await.map_err(|e| e.to_string())?;
     Ok(articles)
 }
 
 #[tauri::command]
-pub async fn get_article(article_id: String, db: State<'_, DbState>) -> Result<crate::db::models::Article, String> {
+pub async fn get_article(article_id: String, db: State<'_, DbState>) -> Result<feedwire_core::models::Article, String> {
     let db = db.lock().await;
     let article = db.get_article_by_id(&article_id).await.map_err(|e| e.to_string())?;
     Ok(article)
 }
 
 #[tauri::command]
-pub async fn mark_article_read(article_id: String, is_read: bool, db: State<'_, DbState>) -> Result<crate::db::models::Article, String> {
+pub async fn mark_article_read(article_id: String, is_read: bool, db: State<'_, DbState>) -> Result<feedwire_core::models::Article, String> {
     let db = db.lock().await;
     let update = ArticleUpdate {
         is_read: Some(is_read),
@@ -161,7 +161,7 @@ pub async fn mark_article_read(article_id: String, is_read: bool, db: State<'_, 
 }
 
 #[tauri::command]
-pub async fn toggle_bookmark(article_id: String, db: State<'_, DbState>) -> Result<crate::db::models::Article, String> {
+pub async fn toggle_bookmark(article_id: String, db: State<'_, DbState>) -> Result<feedwire_core::models::Article, String> {
     let db = db.lock().await;
     
     // Get current article to check bookmark status
@@ -177,7 +177,7 @@ pub async fn toggle_bookmark(article_id: String, db: State<'_, DbState>) -> Resu
 }
 
 #[tauri::command]
-pub async fn get_bookmarked_articles(feed_id: Option<String>, db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
+pub async fn get_bookmarked_articles(feed_id: Option<String>, db: State<'_, DbState>) -> Result<Vec<feedwire_core::models::Article>, String> {
     let db = db.lock().await;
     let articles = db.get_bookmarked_articles(feed_id.as_deref()).await.map_err(|e| e.to_string())?;
     Ok(articles)
@@ -198,14 +198,14 @@ pub async fn get_bookmark_counts(db: State<'_, DbState>) -> Result<std::collecti
 }
 
 #[tauri::command]
-pub async fn get_unread_articles(db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
+pub async fn get_unread_articles(db: State<'_, DbState>) -> Result<Vec<feedwire_core::models::Article>, String> {
     let db = db.lock().await;
     let articles = db.get_unread_articles().await.map_err(|e| e.to_string())?;
     Ok(articles)
 }
 
 #[tauri::command]
-pub async fn get_today_articles(db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
+pub async fn get_today_articles(db: State<'_, DbState>) -> Result<Vec<feedwire_core::models::Article>, String> {
     let db = db.lock().await;
     let articles = db.get_today_articles().await.map_err(|e| e.to_string())?;
     Ok(articles)
@@ -218,105 +218,33 @@ pub async fn mark_all_read(feed_id: Option<String>, db: State<'_, DbState>) -> R
 }
 
 #[tauri::command]
-pub async fn refresh_feed(feed_id: String, db: State<'_, DbState>) -> Result<Vec<crate::db::models::Article>, String> {
-    // Fetch feed URL + filter settings — brief lock, released before any network I/O
-    let (feed_url, skip_shorts, rules) = {
-        let db_guard = db.lock().await;
-        let url = db_guard.get_feed_by_id(&feed_id).await.map_err(|e| e.to_string())?.url;
-        let skip_shorts = db_guard
-            .get_setting(SETTING_SKIP_YOUTUBE_SHORTS)
-            .await
-            .map_err(|e| e.to_string())?
-            .map(|v| v == "true")
-            .unwrap_or(false);
-        let rules = db_guard.get_filter_rules().await.map_err(|e| e.to_string())?;
-        (url, skip_shorts, rules)
-    };
-
-    // Network call — no lock held
-    let parser = FeedParser::new();
-    let (_, articles) = parser.fetch_feed(&feed_url).await.map_err(|e| e.to_string())?;
-
-    // Apply filters
-    let filtered: Vec<_> = articles
-        .into_iter()
-        .filter(|a| should_keep(a, skip_shorts, &rules))
-        .collect();
-
-    // Persist — lock held only for DB writes
-    let db_guard = db.lock().await;
-    let mut saved_articles = Vec::new();
-    for mut article in filtered {
-        article.feed_id = feed_id.clone();
-        let saved = db_guard.create_article(article).await.map_err(|e| e.to_string())?;
-        saved_articles.push(saved);
-    }
-
-    let update = FeedUpdate {
-        last_fetched: Some(chrono::Utc::now()),
-        ..Default::default()
-    };
-    db_guard.update_feed(&feed_id, update).await.map_err(|e| e.to_string())?;
-
-    Ok(saved_articles)
+pub async fn refresh_feed(feed_id: String, db: State<'_, DbState>) -> Result<Vec<feedwire_core::models::Article>, String> {
+    let db = db.inner().clone();
+    refresh::refresh_feed(&db, &feed_id)
+        .await
+        .map_err(|e| e.to_string())
 }
-
-const REFRESH_CONCURRENCY: usize = 10;
 
 #[tauri::command]
 pub async fn refresh_all_feeds(app: AppHandle, db: State<'_, DbState>) -> Result<Vec<String>, String> {
     refresh_all_feeds_inner(app, db.inner().clone()).await.map_err(|e| e.to_string())
 }
 
-/// Inner implementation shared by the command and the background timer.
+/// Refreshes every feed through the shared core engine, forwarding progress to
+/// the frontend as a Tauri event. Called by the command above and by the
+/// background refresh timer in `lib.rs`.
 pub async fn refresh_all_feeds_inner(
     app: AppHandle,
-    db: Arc<Mutex<Database>>,
+    db: DbState,
 ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-    // Collect feed list — brief lock
-    let feeds = {
-        let db_guard = db.lock().await;
-        db_guard.get_feeds().await?
-    };
-
-    let total = feeds.len();
-    let sem = Arc::new(Semaphore::new(REFRESH_CONCURRENCY));
-    // Atomic counter so concurrent tasks can report progress in order
-    let done_counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let refreshed: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-
-    let mut handles = Vec::with_capacity(feeds.len());
-
-    for feed in feeds {
-        let sem = sem.clone();
-        let db = db.clone();
-        let app = app.clone();
-        let done_counter = done_counter.clone();
-        let refreshed = refreshed.clone();
-
-        let handle = tokio::spawn(async move {
-            let _permit = sem.acquire().await;
-            let ok = refresh_feed_helper(feed.id.clone(), db).await.is_ok();
-            if !ok {
-                eprintln!("Failed to refresh feed {}", feed.id);
-            }
-            let done = done_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            if ok {
-                refreshed.lock().await.push(feed.id.clone());
-            }
-            let _ = app.emit("refresh-progress", RefreshProgress {
-                done,
-                total,
-                feed_title: feed.title.clone(),
-            });
-        });
-        handles.push(handle);
-    }
-
-    for h in handles { let _ = h.await; }
-
-    let result = refreshed.lock().await.clone();
-    Ok(result)
+    let app_for_events = app.clone();
+    refresh::refresh_all(db, move |done, total, feed_title| {
+        let _ = app_for_events.emit(
+            "refresh-progress",
+            RefreshProgress { done, total, feed_title: feed_title.to_string() },
+        );
+    })
+    .await
 }
 
 #[tauri::command]
@@ -324,61 +252,6 @@ pub async fn get_unread_count(feed_id: Option<String>, db: State<'_, DbState>) -
     let db = db.lock().await;
     let count = db.get_unread_count(feed_id).await.map_err(|e| e.to_string())?;
     Ok(count)
-}
-
-async fn fetch_feed_articles(feed_id: String, db: Arc<Mutex<Database>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Read feed URL, existing icon_url, + filter settings — brief lock
-    let (feed_url, existing_icon_url, skip_shorts, rules) = {
-        let db_guard = db.lock().await;
-        let feed = db_guard.get_feed_by_id(&feed_id).await?;
-        let skip_shorts = db_guard
-            .get_setting(SETTING_SKIP_YOUTUBE_SHORTS)
-            .await?
-            .map(|v| v == "true")
-            .unwrap_or(false);
-        let rules = db_guard.get_filter_rules().await?;
-        (feed.url, feed.icon_url, skip_shorts, rules)
-    };
-
-    // Network call — no lock held
-    const MAX_INITIAL_ARTICLES: usize = 15;
-    let parser = FeedParser::new();
-    let (new_feed_meta, articles) = parser.fetch_feed(&feed_url).await?;
-
-    // Apply filters before persisting
-    let filtered: Vec<_> = articles
-        .into_iter()
-        .filter(|a| should_keep(a, skip_shorts, &rules))
-        .take(MAX_INITIAL_ARTICLES)
-        .collect();
-
-    // Backfill icon_url if:
-    // - it was never set (NULL), or
-    // - it's the generic YouTube favicon fallback (meaning the real channel avatar
-    //   wasn't scraped yet, e.g. feeds added before fetch_youtube_avatar was added)
-    let needs_icon_backfill = existing_icon_url.as_deref()
-        .map(|u| u.is_empty() || (u.contains("google.com/s2/favicons") && u.contains("youtube.com")))
-        .unwrap_or(true); // None → needs backfill
-    let icon_url = if needs_icon_backfill { new_feed_meta.icon_url } else { None };
-
-    // Write articles — lock held only for DB operations
-    let db_guard = db.lock().await;
-    for mut article in filtered {
-        article.feed_id = feed_id.clone();
-        db_guard.create_article(article).await?;
-    }
-    let update = FeedUpdate {
-        last_fetched: Some(chrono::Utc::now()),
-        icon_url,
-        ..Default::default()
-    };
-    db_guard.update_feed(&feed_id, update).await?;
-
-    Ok(())
-}
-
-async fn refresh_feed_helper(feed_id: String, db: Arc<Mutex<Database>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    fetch_feed_articles(feed_id, db).await
 }
 
 // ── Folder commands ───────────────────────────────────────────────────────────
@@ -420,7 +293,7 @@ pub async fn set_feed_folder(
     feed_id: String,
     folder_id: Option<String>,
     db: State<'_, DbState>,
-) -> Result<crate::db::models::Feed, String> {
+) -> Result<feedwire_core::models::Feed, String> {
     let db_guard = db.lock().await;
     db_guard
         .set_feed_folder(&feed_id, folder_id.as_deref())
@@ -431,7 +304,7 @@ pub async fn set_feed_folder(
 // ── Filter rule commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn get_filter_settings(db: State<'_, DbState>) -> Result<crate::db::models::FilterSettings, String> {
+pub async fn get_filter_settings(db: State<'_, DbState>) -> Result<feedwire_core::models::FilterSettings, String> {
     let db_guard = db.lock().await;
     let skip_youtube_shorts = db_guard
         .get_setting(SETTING_SKIP_YOUTUBE_SHORTS)
@@ -440,7 +313,7 @@ pub async fn get_filter_settings(db: State<'_, DbState>) -> Result<crate::db::mo
         .map(|v| v == "true")
         .unwrap_or(false);
     let rules = db_guard.get_filter_rules().await.map_err(|e| e.to_string())?;
-    Ok(crate::db::models::FilterSettings { skip_youtube_shorts, rules })
+    Ok(feedwire_core::models::FilterSettings { skip_youtube_shorts, rules })
 }
 
 #[tauri::command]
@@ -453,7 +326,7 @@ pub async fn set_skip_youtube_shorts(enabled: bool, db: State<'_, DbState>) -> R
 }
 
 #[tauri::command]
-pub async fn add_filter_rule(pattern: String, field: String, db: State<'_, DbState>) -> Result<crate::db::models::FilterRule, String> {
+pub async fn add_filter_rule(pattern: String, field: String, db: State<'_, DbState>) -> Result<feedwire_core::models::FilterRule, String> {
     // Validate field
     if field != "url" && field != "title" {
         return Err(format!("Invalid field '{}': must be 'url' or 'title'", field));
@@ -485,8 +358,6 @@ pub async fn delete_filter_rule(rule_id: String, db: State<'_, DbState>) -> Resu
         .await
         .map_err(|e| e.to_string())
 }
-
-const SETTING_AUTO_REFRESH_INTERVAL: &str = "auto_refresh_interval_minutes";
 
 /// Returns the configured auto-refresh interval in minutes.
 /// Unset defaults to 30; an explicit 0 disables background refresh.
@@ -662,7 +533,7 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
             let db_guard = db.lock().await;
             match db_guard.create_or_reactivate_feed(new_feed).await {
                 Ok(f) => f,
-                Err(crate::db::DatabaseError::DuplicateUrl) => {
+                Err(feedwire_core::DatabaseError::DuplicateUrl) => {
                     skipped += 1;
                     continue;
                 }
@@ -679,7 +550,7 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
         };
 
         // Fetch initial articles in background (non-fatal if this fails)
-        if let Err(e) = fetch_feed_articles(feed.id.clone(), db.inner().clone()).await {
+        if let Err(e) = refresh::fetch_feed_articles(feed.id.clone(), db.inner().clone()).await {
             eprintln!("OPML import: initial article fetch failed for {}: {}", feed.id, e);
         }
 
@@ -687,31 +558,4 @@ pub async fn import_opml(app: tauri::AppHandle, db: State<'_, DbState>) -> Resul
     }
 
     Ok(ImportResult { added, skipped, failed })
-}
-
-impl Default for FeedUpdate {
-    fn default() -> Self {
-        Self {
-            title: None,
-            description: None,
-            last_fetched: None,
-            is_active: None,
-            icon_url: None,
-        }
-    }
-}
-
-impl Default for ArticleUpdate {
-    fn default() -> Self {
-        Self {
-            title: None,
-            link: None,
-            description: None,
-            content: None,
-            author: None,
-            published_at: None,
-            is_read: None,
-            is_bookmarked: None,
-        }
-    }
 }

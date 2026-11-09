@@ -143,7 +143,9 @@ pub struct NewArticle {
     pub guid: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Partial update for a feed row; `None` fields are left unchanged.
+/// Derived `Default` yields an empty (no-op) update.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FeedUpdate {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -152,7 +154,9 @@ pub struct FeedUpdate {
     pub icon_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Partial update for an article row; `None` fields are left unchanged.
+/// Derived `Default` yields an empty (no-op) update.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ArticleUpdate {
     pub title: Option<String>,
     pub link: Option<String>,

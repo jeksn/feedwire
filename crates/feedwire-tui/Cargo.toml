@@ -1,0 +1,13 @@
+[package]
+name = "feedwire-tui"
+description = "FeedWire terminal client"
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+feedwire-core = { path = "../feedwire-core" }
+ratatui = "0.29"
+crossterm = "0.28"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }

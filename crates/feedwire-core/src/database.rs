@@ -1,6 +1,11 @@
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{SqlitePool, sqlite::{SqliteConnectOptions, SqliteJournalMode}};
 use std::str::FromStr;
-use crate::db::models::*;
+use crate::models::*;
+
+/// Setting key: built-in YouTube Shorts filter.
+pub const SETTING_SKIP_YOUTUBE_SHORTS: &str = "skip_youtube_shorts";
+/// Setting key: auto-refresh interval in minutes (0 disables).
+pub const SETTING_AUTO_REFRESH_INTERVAL: &str = "auto_refresh_interval_minutes";
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatabaseError {
@@ -29,9 +34,15 @@ impl Database {
     }
 
     /// Open using a raw SQLite connection string (used by tests with `sqlite::memory:`).
+    ///
+    /// WAL journaling and a busy timeout are enabled so multiple processes
+    /// (GUI app + terminal client) can read and write the same file without
+    /// `database is locked` contention.
     pub async fn with_url(url: &str) -> Result<Self, DatabaseError> {
         let connect_options = SqliteConnectOptions::from_str(url)?
-            .create_if_missing(true);
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal)
+            .busy_timeout(std::time::Duration::from_secs(5));
 
         let pool = SqlitePool::connect_with(connect_options).await?;
 
@@ -566,6 +577,27 @@ impl Database {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows.into_iter().collect())
+    }
+
+    /// Unread count per feed, for feeds that have at least one unread article.
+    pub async fn get_unread_counts(&self) -> Result<std::collections::HashMap<String, i64>, DatabaseError> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT feed_id, COUNT(*) FROM articles WHERE is_read = 0 GROUP BY feed_id"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().collect())
+    }
+
+    /// Current `PRAGMA data_version`. SQLite bumps this whenever another
+    /// connection commits a write, so long-running frontends can poll it
+    /// cheaply to detect external changes to the database (e.g. the other
+    /// FeedWire frontend writing while this one is open).
+    pub async fn data_version(&self) -> Result<i64, DatabaseError> {
+        let version: i64 = sqlx::query_scalar("PRAGMA data_version")
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(version)
     }
 
     pub async fn mark_all_read(&self, feed_id: Option<&str>) -> Result<(), DatabaseError> {

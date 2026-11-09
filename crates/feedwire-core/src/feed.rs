@@ -1,8 +1,8 @@
 use feed_rs::parser;
 use reqwest::Client;
 use url::Url;
-use crate::db::models::{NewFeed, NewArticle};
-use crate::db::DatabaseError;
+use crate::models::{NewFeed, NewArticle};
+use crate::DatabaseError;
 use chrono::{DateTime, Utc, Timelike};
 
 /// Strip HTML tags from a string, collapsing whitespace, for plain-text use.

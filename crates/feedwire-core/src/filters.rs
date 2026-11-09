@@ -3,7 +3,7 @@
 /// Filters are applied when articles are fetched (initial import and refresh).
 /// An article is dropped if ANY enabled filter matches it.
 
-use crate::db::models::{FilterRule, NewArticle};
+use crate::models::{FilterRule, NewArticle};
 
 /// Returns true if the article should be kept, false if it should be dropped.
 pub fn should_keep(

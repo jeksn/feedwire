@@ -2,9 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod db;
-mod opml;
 
-use db::{Database, commands::{DbState, refresh_all_feeds_inner}};
+use db::commands::{DbState, refresh_all_feeds_inner};
+use feedwire_core::Database;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tauri::{Listener, Manager};
@@ -103,7 +103,7 @@ pub fn run() {
                         let interval_minutes: u64 = {
                             let guard = db_for_timer.lock().await;
                             guard
-                                .get_setting("auto_refresh_interval_minutes")
+                                .get_setting(feedwire_core::SETTING_AUTO_REFRESH_INTERVAL)
                                 .await
                                 .ok()
                                 .flatten()
