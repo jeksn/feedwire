@@ -26,3 +26,5 @@ dist-ssr
 *.sln
 *.sw?
 *.db
+*.db-shm
+*.db-wal

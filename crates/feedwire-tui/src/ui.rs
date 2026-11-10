@@ -1,17 +1,40 @@
 //! Terminal rendering for FeedWire TUI.
 
 use crate::app::{time_label, truncate, App, Focus, SidebarEntry, View};
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap};
 use ratatui::Frame;
 
+/// ASCII title, shown when the terminal is large enough (width >= logo
+/// width, height >= 24). Falls back to the plain layout otherwise.
+const LOGO: &[&str] = &[
+    r#" ______   ______     ______     _____     __     __     __     ______     ______    "#,
+    r#"/\  ___\ /\  ___\   /\  ___\   /\  __-.  /\ \  _ \ \   /\ \   /\  == \   /\  ___\ "#,
+    r#"\ \  __\ \ \  __\   \ \  __\   \ \ \/\ \ \ \ \/ ".\ \  \ \ \  \ \  __<   \ \  __\ "#,
+    r#" \ \_\    \ \_____\  \ \_____\  \ \____-  \ \__/".~\_\  \ \_\  \ \_\ \_\  \ \_____\"#,
+    r#"  \/_/     \/_____/   \/_____/   \/____/   \/_/   \/_/   \/_/   \/_/ /_/   \/_____/ "#,
+];
+
 pub fn draw(f: &mut Frame, app: &mut App) {
-    let [body, status] =
-        Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(f.area());
+    let logo_height = if f.area().width >= logo_width() && f.area().height >= 24 {
+        LOGO.len() as u16
+    } else {
+        0
+    };
+    let [logo_area, body, status] = Layout::vertical([
+        Constraint::Length(logo_height),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ])
+    .areas(f.area());
+    if logo_height > 0 {
+        draw_logo(f, logo_area);
+    }
+
     let [sidebar_area, list_area, content_area] = Layout::horizontal([
-        Constraint::Length(32),
+        Constraint::Length(36),
         Constraint::Percentage(42),
         Constraint::Min(30),
     ])
@@ -27,16 +50,34 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
 }
 
+fn logo_width() -> u16 {
+    LOGO.iter()
+        .map(|l| l.trim_end().chars().count())
+        .max()
+        .unwrap_or(0) as u16
+}
+
+fn draw_logo(f: &mut Frame, area: Rect) {
+    let lines: Vec<Line> = LOGO
+        .iter()
+        .map(|l| Line::from(l.trim_end().to_string()).fg(Color::Cyan))
+        .collect();
+    let logo = Paragraph::new(lines).alignment(Alignment::Center);
+    f.render_widget(logo, area);
+}
+
 fn focus_border<'a>(focused: bool) -> Block<'a> {
-    if focused {
-        Block::bordered().border_style(Style::new().fg(Color::Cyan))
+    let style = if focused {
+        Style::new().fg(Color::Cyan)
     } else {
-        Block::bordered().border_style(Style::new().fg(Color::DarkGray))
-    }
+        Style::new().fg(Color::DarkGray)
+    };
+    Block::bordered().border_style(style).padding(Padding::horizontal(2))
 }
 
 fn draw_sidebar(f: &mut Frame, app: &App, area: Rect) {
-    let inner_width = area.width.saturating_sub(2) as usize;
+    let block = focus_border(app.focus == Focus::Feeds).title(" Feeds ");
+    let inner_width = block.inner(area).width as usize;
 
     let items: Vec<ListItem> = app
         .entries
@@ -65,7 +106,7 @@ fn draw_sidebar(f: &mut Frame, app: &App, area: Rect) {
     state.select(Some(app.selected_entry));
 
     let list = List::new(items)
-        .block(focus_border(app.focus == Focus::Feeds).title(" Feeds "))
+        .block(block)
         .highlight_style(Style::new().reversed());
     f.render_stateful_widget(list, area, &mut state);
 }
@@ -84,7 +125,8 @@ fn sidebar_row(title: &str, count: Option<i64>, width: usize) -> Line<'static> {
 
 fn draw_article_list(f: &mut Frame, app: &App, area: Rect) {
     let title = current_view_title(app);
-    let inner_width = area.width.saturating_sub(2) as usize;
+    let block = focus_border(app.focus == Focus::Articles).title(format!(" {title} "));
+    let inner_width = block.inner(area).width as usize;
 
     let items: Vec<ListItem> = app
         .articles
@@ -111,7 +153,7 @@ fn draw_article_list(f: &mut Frame, app: &App, area: Rect) {
     state.select(if app.articles.is_empty() { None } else { Some(app.selected_article) });
 
     let list = List::new(items)
-        .block(focus_border(app.focus == Focus::Articles).title(format!(" {title} ")))
+        .block(block)
         .highlight_style(Style::new().reversed());
     f.render_stateful_widget(list, area, &mut state);
 }
@@ -125,7 +167,9 @@ fn current_view_title(app: &App) -> String {
 }
 
 fn draw_content(f: &mut Frame, app: &App, area: Rect) {
-    let block = focus_border(app.focus == Focus::Content);
+    // The reading pane gets extra vertical padding for comfortable reading.
+    let block = focus_border(app.focus == Focus::Content).padding(Padding::new(2, 1, 2, 1));
+    let inner = block.inner(area);
 
     let paragraph = match app.selected_article_ref() {
         Some(article) if app.content_source.as_deref() == Some(article.id.as_str()) => {
@@ -141,14 +185,13 @@ fn draw_content(f: &mut Frame, app: &App, area: Rect) {
             }
 
             // Clamp the scroll to the estimated rendered length.
-            let inner_height = area.height.saturating_sub(2) as usize;
-            let available = app.content_lines.len().saturating_sub(inner_height) as u16;
+            let available = app.content_lines.len().saturating_sub(inner.height as usize) as u16;
             let scroll = app.content_scroll.min(available + 2);
 
             Paragraph::new(lines)
                 .wrap(Wrap { trim: false })
                 .scroll((scroll, 0))
-                .block(block.title(""))
+                .block(block)
         }
         _ => Paragraph::new("Select an article to read it").block(block),
     };
@@ -228,7 +271,8 @@ fn draw_help(f: &mut Frame, area: Rect) {
     let paragraph = Paragraph::new(items).block(
         Block::bordered()
             .title(" Help ")
-            .border_style(Style::new().fg(Color::Yellow)),
+            .border_style(Style::new().fg(Color::Yellow))
+            .padding(Padding::new(3, 1, 3, 1)),
     );
     f.render_widget(paragraph, popup);
 }
@@ -338,6 +382,7 @@ mod tests {
         };
 
         let rendered = render(&mut app, 120, 30);
+        assert!(rendered.contains("______")); // ASCII logo header
         assert!(rendered.contains("Feeds"));
         assert!(rendered.contains("Hacker News"));
         assert!(rendered.contains("(3)"));
@@ -346,9 +391,11 @@ mod tests {
         assert!(rendered.contains("3 unread"));
         assert!(!rendered.contains("Help")); // overlay closed
 
-        // Small terminals must not panic; the help overlay fits.
+        // Small terminals must not panic; the logo is dropped instead of
+        // clipping, and the help overlay still fits.
         app.show_help = true;
         let rendered = render(&mut app, 80, 20);
+        assert!(!rendered.contains("______"));
         assert!(rendered.contains("Quit"));
     }
 }
