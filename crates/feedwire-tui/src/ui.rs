@@ -1,7 +1,7 @@
 //! Terminal rendering for FeedWire TUI.
 
 use crate::app::{time_label, truncate, App, Focus, SidebarEntry, View};
-use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap};
@@ -18,8 +18,9 @@ const LOGO: &[&str] = &[
 ];
 
 pub fn draw(f: &mut Frame, app: &mut App) {
+    // One blank row of margin above and below the logo.
     let logo_height = if f.area().width >= logo_width() && f.area().height >= 24 {
-        LOGO.len() as u16
+        LOGO.len() as u16 + 2
     } else {
         0
     };
@@ -58,11 +59,14 @@ fn logo_width() -> u16 {
 }
 
 fn draw_logo(f: &mut Frame, area: Rect) {
-    let lines: Vec<Line> = LOGO
-        .iter()
-        .map(|l| Line::from(l.trim_end().to_string()).fg(Color::Cyan))
+    let lines: Vec<Line> = std::iter::once(Line::from(""))
+        .chain(
+            LOGO.iter()
+                .map(|l| Line::from(l.trim_end().to_string()).fg(Color::Cyan)),
+        )
+        .chain(std::iter::once(Line::from("")))
         .collect();
-    let logo = Paragraph::new(lines).alignment(Alignment::Center);
+    let logo = Paragraph::new(lines);
     f.render_widget(logo, area);
 }
 
